@@ -1,6 +1,19 @@
 @SqliteWebDemoApi_HostAddress = http://localhost:5282
 
-GET {{SqliteWebDemoApi_HostAddress}}/weatherforecast/
+### Get first page of Users (default page=1, pageSize=50)
+GET {{SqliteWebDemoApi_HostAddress}}/data/Users
+Accept: application/json
+
+###
+
+### Get second page of Users, 2 rows per page
+GET {{SqliteWebDemoApi_HostAddress}}/data/Users?page=2&pageSize=2
+Accept: application/json
+
+###
+
+### Get first 3 Orders
+GET {{SqliteWebDemoApi_HostAddress}}/data/Orders?page=1&pageSize=3
 Accept: application/json
 
 ###
