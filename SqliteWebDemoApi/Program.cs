@@ -8,7 +8,19 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("Default")
     ?? throw new InvalidOperationException("Missing ConnectionStrings:Default");
 
+// ---- CORS: allow any origin ----
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader());
+});
+
 var app = builder.Build();
+
+// ---- Enable CORS globally ----
+app.UseCors("AllowAll");
 
 // GET /data/{tableName}?page=1&pageSize=50
 app.MapGet("/data/{tableName}", async (
@@ -17,7 +29,6 @@ app.MapGet("/data/{tableName}", async (
     int pageSize = 50,
     CancellationToken ct = default) =>
 {
-    // --- Validate table name (avoid injection on identifier) ---
     if (string.IsNullOrWhiteSpace(tableName))
         return Results.BadRequest("tableName is required.");
 
@@ -31,7 +42,6 @@ app.MapGet("/data/{tableName}", async (
     await using var conn = new SqliteConnection(connectionString);
     await conn.OpenAsync(ct);
 
-    // --- Ensure the table exists ---
     const string existsSql = @"SELECT 1 FROM sqlite_master WHERE type='table' AND name=@name;";
     await using (var existsCmd = new SqliteCommand(existsSql, conn))
     {
@@ -41,8 +51,7 @@ app.MapGet("/data/{tableName}", async (
             return Results.NotFound($"Table \"{tableName}\" not found.");
     }
 
-    // --- Total row count ---
-    var quoted = Quote(tableName); // "TableName"
+    var quoted = Quote(tableName);
     var countSql = $"SELECT COUNT(*) FROM {quoted};";
     long totalRows;
     await using (var countCmd = new SqliteCommand(countSql, conn))
@@ -67,8 +76,6 @@ app.MapGet("/data/{tableName}", async (
     if (page > totalPages) page = totalPages;
     var offset = (page - 1) * pageSize;
 
-    // --- Page query ---
-    // Use rowid for a deterministic-ish order when possible (tables created WITHOUT ROWID won't have it)
     var dataSql = $@"
 SELECT *
 FROM {quoted}
@@ -95,7 +102,7 @@ LIMIT @take OFFSET @offset;";
             for (int i = 0; i < fieldCount; i++)
             {
                 var val = await reader.IsDBNullAsync(i, ct) ? null : reader.GetValue(i);
-                if (val is byte[] bytes) val = Convert.ToBase64String(bytes); // JSON-safe blobs
+                if (val is byte[] bytes) val = Convert.ToBase64String(bytes);
                 dict[names[i]] = val;
             }
             rows.Add(dict);
