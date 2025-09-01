@@ -1,19 +1,37 @@
 @SqliteWebDemoApi_HostAddress = http://localhost:5282
 
+### List all tables
+GET {{SqliteWebDemoApi_HostAddress}}/api/tables
+Accept: application/json
+
+###
+
+### List all views
+GET {{SqliteWebDemoApi_HostAddress}}/api/views
+Accept: application/json
+
+###
+
 ### Get first page of Users (default page=1, pageSize=50)
-GET {{SqliteWebDemoApi_HostAddress}}/data/Users
+GET {{SqliteWebDemoApi_HostAddress}}/api/tables/Users
 Accept: application/json
 
 ###
 
 ### Get second page of Users, 2 rows per page
-GET {{SqliteWebDemoApi_HostAddress}}/data/Users?page=2&pageSize=2
+GET {{SqliteWebDemoApi_HostAddress}}/api/tables/Users?page=2&pageSize=2
 Accept: application/json
 
 ###
 
 ### Get first 3 Orders
-GET {{SqliteWebDemoApi_HostAddress}}/data/Orders?page=1&pageSize=3
+GET {{SqliteWebDemoApi_HostAddress}}/api/tables/Orders?page=1&pageSize=3
+Accept: application/json
+
+###
+
+### Example for a view (replace SomeView with an actual view name in your DB)
+GET {{SqliteWebDemoApi_HostAddress}}/api/views/SomeView?page=1&pageSize=10
 Accept: application/json
 
 ###
