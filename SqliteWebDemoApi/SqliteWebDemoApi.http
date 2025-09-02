@@ -30,8 +30,16 @@ Accept: application/json
 
 ###
 
-### Example for a view (replace SomeView with an actual view name in your DB)
-GET {{SqliteWebDemoApi_HostAddress}}/api/views
+### Sort Users by LastName ascending
+GET {{SqliteWebDemoApi_HostAddress}}/api/tables/Users?sortBy=LastName&sortDir=asc&page=1&pageSize=10
 Accept: application/json
 
 ###
+
+### Sort Users by CreatedAt descending (latest first)
+GET {{SqliteWebDemoApi_HostAddress}}/api/tables/Users?sortBy=CreatedAt&sortDir=desc&page=1&pageSize=5
+Accept: application/json
+
+###
+
+

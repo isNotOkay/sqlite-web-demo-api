@@ -11,7 +11,6 @@ namespace SqliteWebDemoApiTest
         private static SqliteController CreateController(Mock<ISqliteService> browserMock)
             => new(browserMock.Object);
 
-
         [Fact]
         public async Task GetTables_ReturnsOk_WithItemsAndTotal()
         {
@@ -68,7 +67,6 @@ namespace SqliteWebDemoApiTest
             browser.VerifyAll();
         }
 
-
         [Fact]
         public async Task GetTableData_ReturnsOk_WithPagedResult()
         {
@@ -87,7 +85,7 @@ namespace SqliteWebDemoApiTest
             };
 
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
-            browser.Setup(b => b.GetTablePageAsync("Users", 2, 50, It.IsAny<CancellationToken>()))
+            browser.Setup(b => b.GetTablePageAsync("Users", 2, 50, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                    .ReturnsAsync(pageResult);
 
             var controller = CreateController(browser);
@@ -103,7 +101,7 @@ namespace SqliteWebDemoApiTest
         public async Task GetTableData_ReturnsBadRequest_OnArgumentException()
         {
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
-            browser.Setup(b => b.GetTablePageAsync("Bad Id", 1, 50, It.IsAny<CancellationToken>()))
+            browser.Setup(b => b.GetTablePageAsync("Bad Id", 1, 50, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                    .ThrowsAsync(new ArgumentException("Invalid identifier.", "tableId"));
 
             var controller = CreateController(browser);
@@ -119,7 +117,7 @@ namespace SqliteWebDemoApiTest
         public async Task GetTableData_ReturnsNotFound_OnKeyNotFoundException()
         {
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
-            browser.Setup(b => b.GetTablePageAsync("Missing", 1, 50, It.IsAny<CancellationToken>()))
+            browser.Setup(b => b.GetTablePageAsync("Missing", 1, 50, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                    .ThrowsAsync(new KeyNotFoundException("Table \"Missing\" not found."));
 
             var controller = CreateController(browser);
@@ -132,10 +130,12 @@ namespace SqliteWebDemoApiTest
         }
 
         [Fact]
-        public async Task GetTableData_UsesDefaultPaging_WhenNotProvided()
+        public async Task GetTableData_UsesDefaultPaging_AndDefaultSorting_WhenNotProvided()
         {
             int? capturedPage = null;
             int? capturedPageSize = null;
+            var capturedSortBy = "SENTINEL";
+            var capturedSortDir = "SENTINEL";
 
             var pageResult = new PagedResult<Dictionary<string, object?>>
             {
@@ -149,25 +149,35 @@ namespace SqliteWebDemoApiTest
             };
 
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
-            browser.Setup(b => b.GetTablePageAsync("Users", It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-                   .Callback<string, int, int, CancellationToken>((_, p, s, _) =>
+            browser.Setup(b => b.GetTablePageAsync(
+                            "Users",
+                            It.IsAny<int>(),
+                            It.IsAny<int>(),
+                            It.IsAny<string?>(),
+                            It.IsAny<string?>(),
+                            It.IsAny<CancellationToken>()))
+                   .Callback<string, int, int, string?, string?, CancellationToken>((_, p, s, sb, sd, _) =>
                    {
                        capturedPage = p;
                        capturedPageSize = s;
+                       capturedSortBy = sb;
+                       capturedSortDir = sd;
                    })
                    .ReturnsAsync(pageResult);
 
             var controller = CreateController(browser);
 
-            // Call without page/pageSize arguments: controller defaults kick in (1, 50)
+            // Call without page/pageSize/sortBy/sortDir: controller defaults kick in (1, 50, null, "asc")
             var result = await controller.GetTableData("Users", ct: CancellationToken.None);
 
             Assert.Equal(1, capturedPage);
             Assert.Equal(50, capturedPageSize);
+            Assert.Null(capturedSortBy);
+            Assert.Equal("asc", capturedSortDir);
             Assert.IsType<OkObjectResult>(result);
             browser.VerifyAll();
         }
-        
+
         [Fact]
         public async Task GetViewData_ReturnsOk_WithPagedResult()
         {
@@ -186,7 +196,7 @@ namespace SqliteWebDemoApiTest
             };
 
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
-            browser.Setup(b => b.GetViewPageAsync("ActiveUsers", 1, 25, It.IsAny<CancellationToken>()))
+            browser.Setup(b => b.GetViewPageAsync("ActiveUsers", 1, 25, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                    .ReturnsAsync(pageResult);
 
             var controller = CreateController(browser);
@@ -203,7 +213,7 @@ namespace SqliteWebDemoApiTest
         {
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
 
-            browser.Setup(b => b.GetViewPageAsync("bad", 1, 50, It.IsAny<CancellationToken>()))
+            browser.Setup(b => b.GetViewPageAsync("bad", 1, 50, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                    .ThrowsAsync(new ArgumentException("Invalid identifier.", "viewId"));
 
             var controller = CreateController(browser);
@@ -212,7 +222,7 @@ namespace SqliteWebDemoApiTest
 
             browser.Reset();
 
-            browser.Setup(b => b.GetViewPageAsync("missing", 1, 50, It.IsAny<CancellationToken>()))
+            browser.Setup(b => b.GetViewPageAsync("missing", 1, 50, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
                    .ThrowsAsync(new KeyNotFoundException("View \"missing\" not found."));
 
             controller = CreateController(browser);

@@ -8,8 +8,8 @@ public interface ISqliteService
     Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken);
 
     Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
-        string tableId, int page, int pageSize, CancellationToken cancellationToken);
+        string tableId, int page, int pageSize, string? sortBy, string? sortDir, CancellationToken cancellationToken);
 
     Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
-        string viewId, int page, int pageSize, CancellationToken cancellationToken);
+        string viewId, int page, int pageSize, string? sortBy, string? sortDir, CancellationToken cancellationToken);
 }

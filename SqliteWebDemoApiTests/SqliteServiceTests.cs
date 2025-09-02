@@ -3,7 +3,6 @@ using SqliteWebDemoApi.Constants;
 using SqliteWebDemoApi.Models;
 using SqliteWebDemoApi.Repositories;
 using SqliteWebDemoApi.Services;
-using SqliteWebDemoApi.Utilities;
 
 namespace SqliteWebDemoApiTest;
 
@@ -11,7 +10,6 @@ public sealed class SqliteServiceTests
 {
     private static SqliteService CreateService(Mock<ISqliteRepository> repoMock) =>
         new(repoMock.Object);
-
 
     [Fact]
     public async Task ListTablesAsync_ReturnsItemsAndTotal_AndUsesTablesQuery()
@@ -70,7 +68,6 @@ public sealed class SqliteServiceTests
         repo.VerifyAll();
     }
 
-
     [Fact]
     public async Task GetTablePageAsync_Throws_WhenTableDoesNotExist()
     {
@@ -83,7 +80,7 @@ public sealed class SqliteServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.GetTablePageAsync("Users", page: 1, pageSize: 50, CancellationToken.None));
+            svc.GetTablePageAsync("Users", page: 1, pageSize: 50, sortBy: null, sortDir: "asc", CancellationToken.None));
 
         repo.VerifyAll();
     }
@@ -104,7 +101,7 @@ public sealed class SqliteServiceTests
         var svc = CreateService(repo);
 
         // Act
-        var page = await svc.GetTablePageAsync("Users", page: 5, pageSize: 100, CancellationToken.None);
+        var page = await svc.GetTablePageAsync("Users", page: 5, pageSize: 100, sortBy: null, sortDir: "asc", CancellationToken.None);
 
         // Assert
         // Paginator ensures TotalPages >= 1, and clamps page to [1..TotalPages]
@@ -120,7 +117,7 @@ public sealed class SqliteServiceTests
     }
 
     [Fact]
-    public async Task GetTablePageAsync_UsesRowIdOrdering_WhenNotWithoutRowId()
+    public async Task GetTablePageAsync_UsesRowIdTiebreaker_WhenTableHasRowId_AndNoSortBy()
     {
         // Arrange
         var repo = new Mock<ISqliteRepository>(MockBehavior.Strict);
@@ -131,7 +128,7 @@ public sealed class SqliteServiceTests
         repo.Setup(r => r.CountRowsAsync("\"Users\"", It.IsAny<CancellationToken>()))
             .ReturnsAsync(123L);
 
-        // IsWithoutRowId = false -> orderByRowId = true
+        // IsWithoutRowId = false -> addRowIdTiebreaker = true
         repo.Setup(r => r.IsWithoutRowIdAsync("Users", It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
 
@@ -140,15 +137,26 @@ public sealed class SqliteServiceTests
             new() { ["Id"] = 1, ["Name"] = "A" }
         ];
 
-        // Capture parameters to validate orderByRowId=true
-        bool? capturedOrderByRowId = null;
+        // Capture parameters to validate ordering flags
+        var capturedOrderByColumn = "sentinel";
+        bool? capturedOrderByDesc = null;
+        bool? capturedAddRowIdTiebreaker = null;
         int? capturedTake = null;
         int? capturedOffset = null;
 
-        repo.Setup(r => r.GetPageAsync("\"Users\"", It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<string, bool, int, int, CancellationToken>((_, orderByRowId, take, offset, _) =>
+        repo.Setup(r => r.GetPageAsync(
+                        "\"Users\"",
+                        It.IsAny<string?>(),
+                        It.IsAny<bool>(),
+                        It.IsAny<bool>(),
+                        It.IsAny<int>(),
+                        It.IsAny<int>(),
+                        It.IsAny<CancellationToken>()))
+            .Callback<string, string?, bool, bool, int, int, CancellationToken>((_, col, desc, addRowId, take, offset, _) =>
             {
-                capturedOrderByRowId = orderByRowId;
+                capturedOrderByColumn = col;
+                capturedOrderByDesc = desc;
+                capturedAddRowIdTiebreaker = addRowId;
                 capturedTake = take;
                 capturedOffset = offset;
             })
@@ -157,12 +165,14 @@ public sealed class SqliteServiceTests
         var svc = CreateService(repo);
 
         // Act
-        var page = await svc.GetTablePageAsync("Users", page: 2, pageSize: 50, CancellationToken.None);
+        var page = await svc.GetTablePageAsync("Users", page: 2, pageSize: 50, sortBy: null, sortDir: "asc", CancellationToken.None);
 
         // Assert
-        Assert.True(capturedOrderByRowId);
+        Assert.Null(capturedOrderByColumn);      // no explicit column
+        Assert.False(capturedOrderByDesc!.Value);// default asc
+        Assert.True(capturedAddRowIdTiebreaker); // rowid tiebreaker added
         Assert.Equal(50, capturedTake);
-        Assert.Equal(50, capturedOffset); // (page-1)*size
+        Assert.Equal(50, capturedOffset);        // (page-1)*size
 
         Assert.Equal("table", page.Type);
         Assert.Equal("Users", page.Name);
@@ -176,7 +186,7 @@ public sealed class SqliteServiceTests
     }
 
     [Fact]
-    public async Task GetTablePageAsync_AvoidsRowIdOrdering_WhenWithoutRowId()
+    public async Task GetTablePageAsync_DoesNotUseRowIdTiebreaker_WhenWithoutRowId_AndNoSortBy()
     {
         // Arrange
         var repo = new Mock<ISqliteRepository>(MockBehavior.Strict);
@@ -187,7 +197,7 @@ public sealed class SqliteServiceTests
         repo.Setup(r => r.CountRowsAsync("\"NoRowIdTable\"", It.IsAny<CancellationToken>()))
             .ReturnsAsync(10L);
 
-        // IsWithoutRowId = true -> orderByRowId = false
+        // IsWithoutRowId = true -> addRowIdTiebreaker = false
         repo.Setup(r => r.IsWithoutRowIdAsync("NoRowIdTable", It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
 
@@ -196,19 +206,29 @@ public sealed class SqliteServiceTests
             new() { ["k"] = 1 }
         ];
 
-        bool? capturedOrderByRowId = null;
+        bool? capturedAddRowIdTiebreaker = null;
 
-        repo.Setup(r => r.GetPageAsync("\"NoRowIdTable\"", It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<string, bool, int, int, CancellationToken>((_, orderByRowId, _, _, _) => capturedOrderByRowId = orderByRowId)
+        repo.Setup(r => r.GetPageAsync(
+                        "\"NoRowIdTable\"",
+                        It.IsAny<string?>(),
+                        It.IsAny<bool>(),
+                        It.IsAny<bool>(),
+                        It.IsAny<int>(),
+                        It.IsAny<int>(),
+                        It.IsAny<CancellationToken>()))
+            .Callback<string, string?, bool, bool, int, int, CancellationToken>((_, __, ___, addRowId, ___take, ___offset, ____) =>
+            {
+                capturedAddRowIdTiebreaker = addRowId;
+            })
             .ReturnsAsync(rows);
 
         var svc = CreateService(repo);
 
         // Act
-        var page = await svc.GetTablePageAsync("NoRowIdTable", page: 1, pageSize: 10, CancellationToken.None);
+        var page = await svc.GetTablePageAsync("NoRowIdTable", page: 1, pageSize: 10, sortBy: null, sortDir: "asc", CancellationToken.None);
 
         // Assert
-        Assert.False(capturedOrderByRowId);
+        Assert.False(capturedAddRowIdTiebreaker);
         Assert.Equal("table", page.Type);
         Assert.Equal("NoRowIdTable", page.Name);
         Assert.Equal(10, page.TotalRows);
@@ -231,7 +251,7 @@ public sealed class SqliteServiceTests
 
         // Act & Assert
         await Assert.ThrowsAsync<KeyNotFoundException>(() =>
-            svc.GetViewPageAsync("ActiveUsers", page: 1, pageSize: 50, CancellationToken.None));
+            svc.GetViewPageAsync("ActiveUsers", page: 1, pageSize: 50, sortBy: null, sortDir: "asc", CancellationToken.None));
 
         repo.VerifyAll();
     }
@@ -251,7 +271,7 @@ public sealed class SqliteServiceTests
         var svc = CreateService(repo);
 
         // Act
-        var page = await svc.GetViewPageAsync("ActiveUsers", page: 3, pageSize: 25, CancellationToken.None);
+        var page = await svc.GetViewPageAsync("ActiveUsers", page: 3, pageSize: 25, sortBy: null, sortDir: "asc", CancellationToken.None);
 
         // Assert
         Assert.Equal("view", page.Type);
@@ -266,7 +286,7 @@ public sealed class SqliteServiceTests
     }
 
     [Fact]
-    public async Task GetViewPageAsync_NeverUsesRowIdOrdering()
+    public async Task GetViewPageAsync_NeverUsesRowIdTiebreaker()
     {
         // Arrange
         var repo = new Mock<ISqliteRepository>(MockBehavior.Strict);
@@ -282,19 +302,32 @@ public sealed class SqliteServiceTests
             new() { ["Id"] = 7, ["Name"] = "Z" }
         ];
 
-        bool? capturedOrderByRowId = null;
+        bool? capturedAddRowIdTiebreaker = null;
+        var capturedOrderByColumn = "sentinel";
 
-        repo.Setup(r => r.GetPageAsync("\"ActiveUsers\"", It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
-            .Callback<string, bool, int, int, CancellationToken>((_, orderByRowId, _, _, _) => capturedOrderByRowId = orderByRowId)
+        repo.Setup(r => r.GetPageAsync(
+                        "\"ActiveUsers\"",
+                        It.IsAny<string?>(),
+                        It.IsAny<bool>(),
+                        It.IsAny<bool>(),
+                        It.IsAny<int>(),
+                        It.IsAny<int>(),
+                        It.IsAny<CancellationToken>()))
+            .Callback<string, string?, bool, bool, int, int, CancellationToken>((_, col, __, addRowId, ___, ____, _____) =>
+            {
+                capturedOrderByColumn = col;
+                capturedAddRowIdTiebreaker = addRowId;
+            })
             .ReturnsAsync(rows);
 
         var svc = CreateService(repo);
 
         // Act
-        var page = await svc.GetViewPageAsync("ActiveUsers", page: 2, pageSize: 20, CancellationToken.None);
+        var page = await svc.GetViewPageAsync("ActiveUsers", page: 2, pageSize: 20, sortBy: null, sortDir: "asc", CancellationToken.None);
 
         // Assert
-        Assert.False(capturedOrderByRowId); // always false for views
+        Assert.Null(capturedOrderByColumn);          // no explicit column by default
+        Assert.False(capturedAddRowIdTiebreaker);    // never add rowid for views
         Assert.Equal("view", page.Type);
         Assert.Equal(42, page.TotalRows);
         Assert.Same(rows, page.Data);

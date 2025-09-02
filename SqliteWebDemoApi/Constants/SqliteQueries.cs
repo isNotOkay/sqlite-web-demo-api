@@ -1,4 +1,6 @@
-﻿namespace SqliteWebDemoApi.Constants;
+﻿using System.Text;
+
+namespace SqliteWebDemoApi.Constants;
 
 public static class SqliteQueries
 {
@@ -43,4 +45,29 @@ public static class SqliteQueries
         orderByRowId
             ? $"SELECT * FROM {quotedName} ORDER BY rowid LIMIT @take OFFSET @offset;"
             : $"SELECT * FROM {quotedName} LIMIT @take OFFSET @offset;";
+
+    public static string SelectPage(string quotedName, string? orderByColumn, bool orderByDesc, bool addRowIdTiebreaker)
+    {
+        // Base select
+        var sb = new StringBuilder()
+            .Append("SELECT * FROM ").Append(quotedName);
+
+        // ORDER BY (safe: identifiers were validated & quoted earlier)
+        if (!string.IsNullOrEmpty(orderByColumn))
+        {
+            sb.Append(" ORDER BY ")
+                .Append(orderByColumn)
+                .Append(orderByDesc ? " DESC" : " ASC");
+
+            if (addRowIdTiebreaker)
+                sb.Append(", rowid"); // stable paging when values tie
+        }
+        else if (addRowIdTiebreaker)
+        {
+            sb.Append(" ORDER BY rowid");
+        }
+
+        sb.Append(" LIMIT @take OFFSET @offset");
+        return sb.ToString();
+    }
 }

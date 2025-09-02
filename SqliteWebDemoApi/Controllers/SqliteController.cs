@@ -30,11 +30,13 @@ public sealed class SqliteController(ISqliteService service) : ControllerBase
         string tableId,
         [FromQuery] int page = DefaultPage,
         [FromQuery] int pageSize = DefaultPageSize,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDir = "asc",
         CancellationToken ct = default)
     {
         try
         {
-            var result = await service.GetTablePageAsync(tableId, page, pageSize, ct);
+            var result = await service.GetTablePageAsync(tableId, page, pageSize, sortBy, sortDir, ct);
             return Ok(result);
         }
         catch (ArgumentException ex)
@@ -52,11 +54,13 @@ public sealed class SqliteController(ISqliteService service) : ControllerBase
         string viewId,
         [FromQuery] int page = DefaultPage,
         [FromQuery] int pageSize = DefaultPageSize,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? sortDir = "asc",
         CancellationToken ct = default)
     {
         try
         {
-            var result = await service.GetViewPageAsync(viewId, page, pageSize, ct);
+            var result = await service.GetViewPageAsync(viewId, page, pageSize, sortBy, sortDir, ct);
             return Ok(result);
         }
         catch (ArgumentException ex)

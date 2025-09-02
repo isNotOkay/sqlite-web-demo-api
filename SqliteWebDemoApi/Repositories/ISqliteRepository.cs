@@ -1,6 +1,4 @@
-﻿// Replaces the “give me a connection” style with focused operations.
-
-using SqliteWebDemoApi.Models;
+﻿using SqliteWebDemoApi.Models;
 
 namespace SqliteWebDemoApi.Repositories;
 
@@ -11,6 +9,16 @@ public interface ISqliteRepository
     Task<long> CountRowsAsync(string quotedName, CancellationToken ct);
     Task<bool> IsWithoutRowIdAsync(string tableName, CancellationToken ct);
 
+    // NEW: expose schema to validate sortBy
+    Task<string[]> GetColumnNamesAsync(string quotedName, CancellationToken ct);
+
+    // UPDATED: allow ordered pagination
     Task<IReadOnlyList<Dictionary<string, object?>>> GetPageAsync(
-        string quotedName, bool orderByRowId, int take, int offset, CancellationToken ct);
+        string quotedName,
+        string? orderByColumn,
+        bool orderByDesc,
+        bool addRowIdTiebreaker,
+        int take,
+        int offset,
+        CancellationToken ct);
 }

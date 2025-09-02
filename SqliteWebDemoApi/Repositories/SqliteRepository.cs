@@ -75,10 +75,16 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
     }
 
     public async Task<IReadOnlyList<Dictionary<string, object?>>> GetPageAsync(
-        string quotedName, bool orderByRowId, int take, int offset, CancellationToken ct)
+        string quotedName,
+        string? orderByColumn,
+        bool orderByDesc,
+        bool addRowIdTiebreaker,
+        int take,
+        int offset,
+        CancellationToken ct)
     {
         await using var connection = await OpenAsync(ct);
-        var sql = SqliteQueries.SelectPage(quotedName, orderByRowId);
+        var sql = SqliteQueries.SelectPage(quotedName, orderByColumn, orderByDesc, addRowIdTiebreaker);
 
         await using var sqliteCommand = new SqliteCommand(sql, connection);
         sqliteCommand.Parameters.AddWithValue("@take", take);
@@ -97,7 +103,7 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
         return rows;
     }
 
-    private async Task<string[]> GetColumnNamesAsync(string quotedName, CancellationToken ct)
+    public async Task<string[]> GetColumnNamesAsync(string quotedName, CancellationToken ct)
     {
         await using var connection = await OpenAsync(ct);
         await using var sqliteCommand = new SqliteCommand(SqliteQueries.SelectSchemaOnly(quotedName), connection);

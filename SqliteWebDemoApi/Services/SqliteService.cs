@@ -14,7 +14,7 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
         ListRelationsAsync(SqliteQueries.ListViews, ct);
 
     public async Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
-        string tableId, int page, int pageSize, CancellationToken ct)
+        string tableId, int page, int pageSize, string? sortBy, string? sortDir, CancellationToken ct)
     {
         SqliteIdentifierUtil.EnsureValid(tableId, nameof(tableId));
         if (!await repo.ObjectExistsAsync("table", tableId, ct))
@@ -29,14 +29,18 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
         if (totalRows == 0)
             return BuildPage("table", tableId, normalizedPage, normalizedPageSize, 0, totalPages, []);
 
-        var orderByRowId = !await repo.IsWithoutRowIdAsync(tableId, ct);
-        var rows = await repo.GetPageAsync(quoted, orderByRowId, normalizedPageSize, offset, ct);
+        // Sorting
+        var (orderByColumn, orderByDesc, addRowIdTiebreaker) =
+            await BuildSortAsync(quoted, isView: false, sortBy, sortDir, tableId, ct);
+
+        var rows = await repo.GetPageAsync(
+            quoted, orderByColumn, orderByDesc, addRowIdTiebreaker, normalizedPageSize, offset, ct);
 
         return BuildPage("table", tableId, normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
     }
 
     public async Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
-        string viewId, int page, int pageSize, CancellationToken ct)
+        string viewId, int page, int pageSize, string? sortBy, string? sortDir, CancellationToken ct)
     {
         SqliteIdentifierUtil.EnsureValid(viewId, nameof(viewId));
         if (!await repo.ObjectExistsAsync("view", viewId, ct))
@@ -51,10 +55,44 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
         if (totalRows == 0)
             return BuildPage("view", viewId, normalizedPage, normalizedPageSize, 0, totalPages, []);
 
-        // Views never use rowid ordering
-        var rows = await repo.GetPageAsync(quoted, orderByRowId: false, normalizedPageSize, offset, ct);
+        var (orderByColumn, orderByDesc, addRowIdTiebreaker) =
+            await BuildSortAsync(quoted, isView: true, sortBy, sortDir, viewId, ct);
+
+        var rows = await repo.GetPageAsync(
+            quoted, orderByColumn, orderByDesc, addRowIdTiebreaker, normalizedPageSize, offset, ct);
 
         return BuildPage("view", viewId, normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
+    }
+    
+    private async Task<(string? OrderByColumn, bool OrderByDesc, bool AddRowIdTiebreaker)> BuildSortAsync(
+        string quotedName, bool isView, string? sortBy, string? sortDir, string rawName, CancellationToken ct)
+    {
+        // Direction
+        var desc = (sortDir ?? "asc").Equals("desc", StringComparison.OrdinalIgnoreCase);
+        if (!"asc".Equals(sortDir ?? "asc", StringComparison.OrdinalIgnoreCase) &&
+            !"desc".Equals(sortDir ?? "asc", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("sortDir must be 'asc' or 'desc'.");
+
+        // If client did not request a column, fall back to rowid for tables (if available), none for views.
+        if (string.IsNullOrWhiteSpace(sortBy))
+        {
+            var hasRowId = !isView && !await repo.IsWithoutRowIdAsync(rawName, ct);
+            return (null, desc, addRowIdTiebreaker: hasRowId);
+        }
+
+        // Validate column exists
+        var columns = await repo.GetColumnNamesAsync(quotedName, ct);
+        var matched = columns.FirstOrDefault(c => c.Equals(sortBy, StringComparison.OrdinalIgnoreCase));
+        if (matched is null)
+            throw new ArgumentException($"Column '{sortBy}' does not exist on \"{rawName}\".");
+
+        // Quote the matched column (preserve exact case as returned from schema)
+        var quotedColumn = SqliteIdentifierUtil.Quote(matched);
+
+        // Add a deterministic tiebreaker if table has rowid
+        var addRowId = !isView && !await repo.IsWithoutRowIdAsync(rawName, ct);
+
+        return (quotedColumn, desc, addRowId);
     }
 
     private async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListRelationsAsync(string listSql, CancellationToken ct)
