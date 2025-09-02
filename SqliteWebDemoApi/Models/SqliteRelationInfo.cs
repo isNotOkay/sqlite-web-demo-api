@@ -1,6 +1,6 @@
 ﻿namespace SqliteWebDemoApi.Models;
 
-public sealed class DbObjectInfo
+public sealed class SqliteRelationInfo
 {
     public required string Name { get; init; }
     public required long RowCount { get; init; }

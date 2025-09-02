@@ -8,19 +8,19 @@ namespace SqliteWebDemoApi.Services;
 
 public sealed class SqliteBrowser(ISqliteRepository sqliteRepository) : ISqliteBrowser
 {
-    public async Task<(IReadOnlyList<DbObjectInfo> Items, int Total)> ListTablesAsync(CancellationToken cancellationToken) =>
+    public async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListTablesAsync(CancellationToken cancellationToken) =>
         await ListObjectsAsync(SqliteQueries.ListTables, cancellationToken);
 
-    public async Task<(IReadOnlyList<DbObjectInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken) =>
+    public async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken) =>
         await ListObjectsAsync(SqliteQueries.ListViews, cancellationToken);
 
-    private async Task<(IReadOnlyList<DbObjectInfo> Items, int Total)> ListObjectsAsync(
+    private async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListObjectsAsync(
         string listObjectsSql,
         CancellationToken cancellationToken)
     {
         await using var connection = await sqliteRepository.OpenConnectionAsync(cancellationToken);
 
-        var results = new List<DbObjectInfo>();
+        var results = new List<SqliteRelationInfo>();
 
         await using (var sqliteCommand = new SqliteCommand(listObjectsSql, connection))
         await using (var reader = await sqliteCommand.ExecuteReaderAsync(cancellationToken))
@@ -40,7 +40,7 @@ public sealed class SqliteBrowser(ISqliteRepository sqliteRepository) : ISqliteB
                 try { columns = await GetColumnNamesAsync(connection, quoted, cancellationToken); }
                 catch { columns = []; }
 
-                results.Add(new DbObjectInfo
+                results.Add(new SqliteRelationInfo
                 {
                     Name = name,
                     RowCount = rowCount,
