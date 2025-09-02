@@ -184,8 +184,8 @@ public sealed class SqliteBrowser(ISqliteRepository sqliteRepository) : ISqliteB
     {
         await using var sqliteCommand = new SqliteCommand(SqliteQueries.CheckWithoutRowId, connection);
         sqliteCommand.Parameters.AddWithValue("@name", tableName);
-        var v = await sqliteCommand.ExecuteScalarAsync(cancellationToken);
-        return v is long n && n > 0;
+        var value = await sqliteCommand.ExecuteScalarAsync(cancellationToken);
+        return value is long and > 0;
     }
 
     private static PagedResult<Dictionary<string, object?>> BuildPage(
