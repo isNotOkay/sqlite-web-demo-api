@@ -7,27 +7,27 @@ using SqliteWebDemoApi.Utilities;
 
 namespace SqliteWebDemoApi.Services;
 
-public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
+public sealed class SqliteBrowser(ISqliteRepository sqliteRepository) : ISqliteBrowser
 {
     public async Task<(IReadOnlyList<TableInfo> Items, int Total)> ListTablesAsync(CancellationToken cancellationToken)
     {
-        await using var conn = await repo.OpenConnectionAsync(cancellationToken);
+        await using var connection = await sqliteRepository.OpenConnectionAsync(cancellationToken);
 
         var results = new List<TableInfo>();
 
-        await using (var cmd = new SqliteCommand(SqliteQueries.ListTables, conn))
-        await using (var r = await cmd.ExecuteReaderAsync(cancellationToken))
+        await using (var sqliteCommand = new SqliteCommand(SqliteQueries.ListTables, connection))
+        await using (var reader = await sqliteCommand.ExecuteReaderAsync(cancellationToken))
         {
-            while (await r.ReadAsync(cancellationToken))
+            while (await reader.ReadAsync(cancellationToken))
             {
-                var name = r.GetString(0);
+                var name = reader.GetString(0);
                 var quoted = SqliteIdentifiers.Quote(name);
 
                 // Row count (best-effort)
                 long rowCount = 0;
                 try
                 {
-                    rowCount = await CountRowsAsync(conn, quoted, cancellationToken);
+                    rowCount = await CountRowsAsync(connection, quoted, cancellationToken);
                 }
                 catch
                 {
@@ -36,7 +36,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 
                 // Column names
                 string[] columns;
-                try { columns = await GetColumnNamesAsync(conn, quoted, cancellationToken); }
+                try { columns = await GetColumnNamesAsync(connection, quoted, cancellationToken); }
                 catch { columns = []; }
 
                 results.Add(new TableInfo
@@ -53,20 +53,20 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 
     public async Task<(IReadOnlyList<ViewInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken)
     {
-        await using var conn = await repo.OpenConnectionAsync(cancellationToken);
+        await using var connection = await sqliteRepository.OpenConnectionAsync(cancellationToken);
 
         var results = new List<ViewInfo>();
 
-        await using (var cmd = new SqliteCommand(SqliteQueries.ListViews, conn))
-        await using (var r = await cmd.ExecuteReaderAsync(cancellationToken))
+        await using (var sqliteCommand = new SqliteCommand(SqliteQueries.ListViews, connection))
+        await using (var reader = await sqliteCommand.ExecuteReaderAsync(cancellationToken))
         {
-            while (await r.ReadAsync(cancellationToken))
+            while (await reader.ReadAsync(cancellationToken))
             {
-                var name = r.GetString(0);
+                var name = reader.GetString(0);
                 var quoted = SqliteIdentifiers.Quote(name);
 
                 string[] columns;
-                try { columns = await GetColumnNamesAsync(conn, quoted, cancellationToken); }
+                try { columns = await GetColumnNamesAsync(connection, quoted, cancellationToken); }
                 catch { columns = []; }
 
                 results.Add(new ViewInfo
@@ -85,14 +85,14 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
     {
         SqliteIdentifiers.EnsureValid(tableId, nameof(tableId));
 
-        await using var conn = await repo.OpenConnectionAsync(cancellationToken);
+        await using var connection = await sqliteRepository.OpenConnectionAsync(cancellationToken);
 
         // Ensure table exists
-        if (!await ObjectExistsAsync(conn, "table", tableId, cancellationToken))
+        if (!await ObjectExistsAsync(connection, "table", tableId, cancellationToken))
             throw new KeyNotFoundException($"Table \"{tableId}\" not found.");
 
         var quoted = SqliteIdentifiers.Quote(tableId);
-        var totalRows = await CountRowsAsync(conn, quoted, cancellationToken);
+        var totalRows = await CountRowsAsync(connection, quoted, cancellationToken);
 
         // Paging
         var (normalizedPage, normalizedPageSize, totalPages, offset) =
@@ -103,11 +103,11 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
                 []);
 
         // Use rowid ordering only if NOT WITHOUT ROWID
-        var orderBy = await IsWithoutRowIdAsync(conn, tableId, cancellationToken) ? "" : "ORDER BY rowid";
+        var orderBy = await IsWithoutRowIdAsync(connection, tableId, cancellationToken) ? "" : "ORDER BY rowid";
         var dataSql = SqliteQueries.SelectPage(quoted, orderByRowId: orderBy != "");
 
         var rows = new List<Dictionary<string, object?>>(normalizedPageSize);
-        await using (var cmd = new SqliteCommand(dataSql, conn))
+        await using (var cmd = new SqliteCommand(dataSql, connection))
         {
             cmd.Parameters.AddWithValue("@take", normalizedPageSize);
             cmd.Parameters.AddWithValue("@offset", offset);
@@ -129,7 +129,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
     {
         SqliteIdentifiers.EnsureValid(viewId, nameof(viewId));
 
-        await using var conn = await repo.OpenConnectionAsync(cancellationToken);
+        await using var conn = await sqliteRepository.OpenConnectionAsync(cancellationToken);
 
         // Ensure view exists
         if (!await ObjectExistsAsync(conn, "view", viewId, cancellationToken))
@@ -149,12 +149,12 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
         var dataSql = SqliteQueries.SelectPage(quoted, orderByRowId: false);
 
         var rows = new List<Dictionary<string, object?>>(normalizedPageSize);
-        await using (var cmd = new SqliteCommand(dataSql, conn))
+        await using (var sqliteCommand = new SqliteCommand(dataSql, conn))
         {
-            cmd.Parameters.AddWithValue("@take", normalizedPageSize);
-            cmd.Parameters.AddWithValue("@offset", offset);
+            sqliteCommand.Parameters.AddWithValue("@take", normalizedPageSize);
+            sqliteCommand.Parameters.AddWithValue("@offset", offset);
 
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
+            await using var reader = await sqliteCommand.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
             var fieldCount = reader.FieldCount;
             var names = new string[fieldCount];
             for (var i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
@@ -183,9 +183,9 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 
         for (var i = 0; i < names.Length; i++)
         {
-            var val = await reader.IsDBNullAsync(i, cancellationToken) ? null : reader.GetValue(i);
-            if (val is byte[] bytes) val = Convert.ToBase64String(bytes);
-            dict[names[i]] = val;
+            var value = await reader.IsDBNullAsync(i, cancellationToken) ? null : reader.GetValue(i);
+            if (value is byte[] bytes) value = Convert.ToBase64String(bytes);
+            dict[names[i]] = value;
         }
 
         return dict;
@@ -193,26 +193,26 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 
     private static async Task<bool> ObjectExistsAsync(SqliteConnection conn, string type, string name, CancellationToken cancellationToken)
     {
-        await using var cmd = new SqliteCommand(SqliteQueries.ObjectExists, conn);
-        cmd.Parameters.AddWithValue("@type", type);
-        cmd.Parameters.AddWithValue("@name", name);
-        var exists = await cmd.ExecuteScalarAsync(cancellationToken);
+        await using var sqliteCommand = new SqliteCommand(SqliteQueries.ObjectExists, conn);
+        sqliteCommand.Parameters.AddWithValue("@type", type);
+        sqliteCommand.Parameters.AddWithValue("@name", name);
+        var exists = await sqliteCommand.ExecuteScalarAsync(cancellationToken);
         return exists is not null;
     }
 
     private static async Task<long> CountRowsAsync(SqliteConnection conn, string quotedName, CancellationToken cancellationToken)
     {
         var sql = SqliteQueries.CountAll(quotedName);
-        await using var cmd = new SqliteCommand(sql, conn);
-        var v = await cmd.ExecuteScalarAsync(cancellationToken);
-        return (long)(v ?? 0L);
+        await using var sqliteCommand = new SqliteCommand(sql, conn);
+        var value = await sqliteCommand.ExecuteScalarAsync(cancellationToken);
+        return (long)(value ?? 0L);
     }
 
-    private static async Task<bool> IsWithoutRowIdAsync(SqliteConnection conn, string tableName, CancellationToken cancellationToken)
+    private static async Task<bool> IsWithoutRowIdAsync(SqliteConnection connection, string tableName, CancellationToken cancellationToken)
     {
-        await using var cmd = new SqliteCommand(SqliteQueries.CheckWithoutRowId, conn);
-        cmd.Parameters.AddWithValue("@name", tableName);
-        var v = await cmd.ExecuteScalarAsync(cancellationToken);
+        await using var sqliteCommand = new SqliteCommand(SqliteQueries.CheckWithoutRowId, connection);
+        sqliteCommand.Parameters.AddWithValue("@name", tableName);
+        var v = await sqliteCommand.ExecuteScalarAsync(cancellationToken);
         return v is long n && n > 0;
     }
     
