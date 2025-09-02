@@ -9,10 +9,10 @@ namespace SqliteWebDemoApi.Services;
 public sealed class SqliteBrowser(ISqliteRepository sqliteRepository) : ISqliteBrowser
 {
     public async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListTablesAsync(CancellationToken cancellationToken) =>
-        await ListObjectsAsync(SqliteQueries.ListTables, cancellationToken);
+        await ListRelationsAsync(SqliteQueries.ListTables, cancellationToken);
 
     public async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken) =>
-        await ListObjectsAsync(SqliteQueries.ListViews, cancellationToken);
+        await ListRelationsAsync(SqliteQueries.ListViews, cancellationToken);
 
     public async Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
         string tableId, int page, int pageSize, CancellationToken cancellationToken)
@@ -100,7 +100,7 @@ public sealed class SqliteBrowser(ISqliteRepository sqliteRepository) : ISqliteB
         return BuildPage("view", viewId, normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
     }
 
-    private async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListObjectsAsync(
+    private async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListRelationsAsync(
         string listObjectsSql,
         CancellationToken cancellationToken)
     {
