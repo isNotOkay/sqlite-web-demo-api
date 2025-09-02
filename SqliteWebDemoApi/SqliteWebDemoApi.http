@@ -31,7 +31,7 @@ Accept: application/json
 ###
 
 ### Example for a view (replace SomeView with an actual view name in your DB)
-GET {{SqliteWebDemoApi_HostAddress}}/api/views/SomeView?page=1&pageSize=10
+GET {{SqliteWebDemoApi_HostAddress}}/api/views
 Accept: application/json
 
 ###
