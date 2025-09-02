@@ -8,5 +8,5 @@ public sealed class PagedResult<T>
     public required int PageSize { get; init; }
     public required long TotalRows { get; init; }
     public required int TotalPages { get; init; }
-    public required IReadOnlyList<T> Data { get; init; } = Array.Empty<T>();
+    public required IReadOnlyList<T> Data { get; init; } = [];
 }
