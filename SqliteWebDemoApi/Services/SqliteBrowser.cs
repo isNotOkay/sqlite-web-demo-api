@@ -99,7 +99,8 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
             Paginator.Paginate(page, pageSize, totalRows);
 
         if (totalRows == 0)
-            return BuildEmptyPage("table", tableId, normalizedPage, normalizedPageSize, totalPages);
+            return BuildPage("table", tableId, normalizedPage, normalizedPageSize, 0, totalPages,
+                []);
 
         // Use rowid ordering only if NOT WITHOUT ROWID
         var orderBy = await IsWithoutRowIdAsync(conn, tableId, cancellationToken) ? "" : "ORDER BY rowid";
@@ -142,7 +143,8 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
             Paginator.Paginate(page, pageSize, totalRows);
 
         if (totalRows == 0)
-            return BuildEmptyPage("view", viewId, normalizedPage, normalizedPageSize, totalPages);
+            return BuildPage("view", viewId, normalizedPage, normalizedPageSize, 0, totalPages,
+                []);
 
         var dataSql = SqliteQueries.SelectPage(quoted, orderByRowId: false);
 
@@ -213,20 +215,15 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
         var v = await cmd.ExecuteScalarAsync(cancellationToken);
         return v is long n && n > 0;
     }
-
-    private static PagedResult<Dictionary<string, object?>> BuildEmptyPage(string type, string name, int page, int pageSize, int totalPages) =>
-        new()
-        {
-            Type = type,
-            Name = name,
-            Page = page,
-            PageSize = pageSize,
-            TotalRows = 0,
-            TotalPages = totalPages,
-            Data = []
-        };
-
-    private static PagedResult<Dictionary<string, object?>> BuildPage(string type, string name, int page, int pageSize, long totalRows, int totalPages, List<Dictionary<string, object?>> rows) =>
+    
+    private static PagedResult<Dictionary<string, object?>> BuildPage(
+        string type,
+        string name,
+        int page,
+        int pageSize,
+        long totalRows,
+        int totalPages,
+        IReadOnlyList<Dictionary<string, object?>> data) =>
         new()
         {
             Type = type,
@@ -235,6 +232,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
             PageSize = pageSize,
             TotalRows = totalRows,
             TotalPages = totalPages,
-            Data = rows
+            Data = data
         };
+
 }
