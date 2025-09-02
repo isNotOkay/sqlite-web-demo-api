@@ -13,9 +13,9 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
 
     private async Task<SqliteConnection> OpenAsync(CancellationToken ct)
     {
-        var conn = new SqliteConnection(ConnectionString);
-        await conn.OpenAsync(ct);
-        return conn;
+        var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync(ct);
+        return connection;
     }
 
     public async Task<IReadOnlyList<SqliteRelationInfo>> ListRelationsAsync(string listSql, CancellationToken ct)
@@ -23,8 +23,8 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
         await using var connection = await OpenAsync(ct);
         var results = new List<SqliteRelationInfo>();
 
-        await using var command = new SqliteCommand(listSql, connection);
-        await using var reader = await command.ExecuteReaderAsync(ct);
+        await using var sqliteCommand = new SqliteCommand(listSql, connection);
+        await using var reader = await sqliteCommand.ExecuteReaderAsync(ct);
 
         while (await reader.ReadAsync(ct))
         {
@@ -33,7 +33,7 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
 
             // Best-effort: some virtual objects/views may fail to count or enumerate schema
             var rowCount = await Try(async () => await CountRowsAsync(quoted, ct), fallback: 0L);
-            var columns  = await Try(async () => await GetColumnNamesAsync(quoted, ct), fallback: []);
+            var columns = await Try(async () => await GetColumnNamesAsync(quoted, ct), fallback: Array.Empty<string>());
 
             results.Add(new SqliteRelationInfo
             {
@@ -49,40 +49,40 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
     public async Task<bool> ObjectExistsAsync(string type, string name, CancellationToken ct)
     {
         await using var connection = await OpenAsync(ct);
-        await using var cmd = new SqliteCommand(SqliteQueries.ObjectExists, connection);
-        cmd.Parameters.AddWithValue("@type", type);
-        cmd.Parameters.AddWithValue("@name", name);
-        var obj = await cmd.ExecuteScalarAsync(ct);
-        return obj is not null;
+        await using var sqliteCommand = new SqliteCommand(SqliteQueries.ObjectExists, connection);
+        sqliteCommand.Parameters.AddWithValue("@type", type);
+        sqliteCommand.Parameters.AddWithValue("@name", name);
+        var result = await sqliteCommand.ExecuteScalarAsync(ct);
+        return result is not null;
     }
 
     public async Task<long> CountRowsAsync(string quotedName, CancellationToken ct)
     {
         await using var connection = await OpenAsync(ct);
-        await using var cmd = new SqliteCommand(SqliteQueries.CountAll(quotedName), connection);
-        var obj = await cmd.ExecuteScalarAsync(ct);
-        return obj is long l ? l : Convert.ToInt64(obj ?? 0);
+        await using var sqliteCommand = new SqliteCommand(SqliteQueries.CountAll(quotedName), connection);
+        var result = await sqliteCommand.ExecuteScalarAsync(ct);
+        return result is long longValue ? longValue : Convert.ToInt64(result ?? 0);
     }
 
     public async Task<string[]> GetColumnNamesAsync(string quotedName, CancellationToken ct)
     {
         await using var connection = await OpenAsync(ct);
-        await using var cmd = new SqliteCommand(SqliteQueries.SelectSchemaOnly(quotedName), connection);
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly, ct);
+        await using var sqliteCommand = new SqliteCommand(SqliteQueries.SelectSchemaOnly(quotedName), connection);
+        await using var reader = await sqliteCommand.ExecuteReaderAsync(CommandBehavior.SchemaOnly, ct);
 
-        var cols = new string[reader.FieldCount];
+        var columns = new string[reader.FieldCount];
         for (var i = 0; i < reader.FieldCount; i++)
-            cols[i] = reader.GetName(i);
-        return cols;
+            columns[i] = reader.GetName(i);
+        return columns;
     }
 
     public async Task<bool> IsWithoutRowIdAsync(string tableName, CancellationToken ct)
     {
         await using var connection = await OpenAsync(ct);
-        await using var cmd = new SqliteCommand(SqliteQueries.CheckWithoutRowId, connection);
-        cmd.Parameters.AddWithValue("@name", tableName);
-        var obj = await cmd.ExecuteScalarAsync(ct);
-        return obj is long n && n > 0;
+        await using var sqliteCommand = new SqliteCommand(SqliteQueries.CheckWithoutRowId, connection);
+        sqliteCommand.Parameters.AddWithValue("@name", tableName);
+        var result = await sqliteCommand.ExecuteScalarAsync(ct);
+        return result is long and > 0;
     }
 
     public async Task<IReadOnlyList<Dictionary<string, object?>>> GetPageAsync(
@@ -91,11 +91,11 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
         await using var connection = await OpenAsync(ct);
         var sql = SqliteQueries.SelectPage(quotedName, orderByRowId);
 
-        await using var cmd = new SqliteCommand(sql, connection);
-        cmd.Parameters.AddWithValue("@take", take);
-        cmd.Parameters.AddWithValue("@offset", offset);
+        await using var sqliteCommand = new SqliteCommand(sql, connection);
+        sqliteCommand.Parameters.AddWithValue("@take", take);
+        sqliteCommand.Parameters.AddWithValue("@offset", offset);
 
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
+        await using var reader = await sqliteCommand.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
 
         var fieldCount = reader.FieldCount;
         var names = new string[fieldCount];
@@ -108,7 +108,6 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
         return rows;
     }
 
-
     private static async Task<T> Try<T>(Func<Task<T>> thunk, T fallback)
     {
         try { return await thunk(); }
@@ -118,13 +117,13 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
     private static async Task<Dictionary<string, object?>> ReadRowAsync(
         SqliteDataReader reader, string[] names, CancellationToken ct)
     {
-        var dict = new Dictionary<string, object?>(names.Length, StringComparer.OrdinalIgnoreCase);
+        var dictionary = new Dictionary<string, object?>(names.Length, StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < names.Length; i++)
         {
             var value = await reader.IsDBNullAsync(i, ct) ? null : reader.GetValue(i);
             if (value is byte[] bytes) value = Convert.ToBase64String(bytes);
-            dict[names[i]] = value;
+            dictionary[names[i]] = value;
         }
-        return dict;
+        return dictionary;
     }
 }

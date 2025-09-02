@@ -17,7 +17,7 @@ internal static class SqliteIdentifiers
 {
     // Only letters, digits, and underscore allowed — matches your original rule.
     private static readonly Regex IdentifierRegex =
-        new(@"^[A-Za-z0-9_]+$", RegexOptions.Compiled);
+        new("^[A-Za-z0-9_]+$", RegexOptions.Compiled);
 
     /// <summary>
     /// Ensures that the identifier is valid, otherwise throws an ArgumentException.
