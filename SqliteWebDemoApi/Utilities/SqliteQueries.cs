@@ -2,31 +2,37 @@
 
 public static class SqliteQueries
 {
-    // --- sqlite_master lookups ---
-    public const string ListTables = @"
-SELECT name, sql
-FROM sqlite_master
-WHERE type = 'table'
-  AND name NOT LIKE 'sqlite_%'
-ORDER BY name;";
+    public const string ListTables = """
 
-    public const string ListViews = @"
-SELECT name, sql
-FROM sqlite_master
-WHERE type = 'view'
-ORDER BY name;";
+                                     SELECT name, sql
+                                     FROM sqlite_master
+                                     WHERE type = 'table'
+                                       AND name NOT LIKE 'sqlite_%'
+                                     ORDER BY name;
+                                     """;
 
-    public const string ObjectExists = @"
-SELECT 1
-FROM sqlite_master
-WHERE type = @type AND name = @name;";
+    public const string ListViews = """
 
-    public const string CheckWithoutRowId = @"
-SELECT instr(lower(sql), 'without rowid')
-FROM sqlite_master
-WHERE type = 'table' AND name = @name;";
+                                    SELECT name, sql
+                                    FROM sqlite_master
+                                    WHERE type = 'view'
+                                    ORDER BY name;
+                                    """;
 
-    // --- Data + schema helpers (require QUOTED identifiers) ---
+    public const string ObjectExists = """
+
+                                       SELECT 1
+                                       FROM sqlite_master
+                                       WHERE type = @type AND name = @name;
+                                       """;
+
+    public const string CheckWithoutRowId = """
+
+                                            SELECT instr(lower(sql), 'without rowid')
+                                            FROM sqlite_master
+                                            WHERE type = 'table' AND name = @name;
+                                            """;
+
     public static string CountAll(string quotedName) =>
         $"SELECT COUNT(*) FROM {quotedName};";
 
