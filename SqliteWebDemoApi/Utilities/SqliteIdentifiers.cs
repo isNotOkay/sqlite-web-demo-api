@@ -13,7 +13,7 @@ namespace SqliteWebDemoApi.Utilities;
 ///   then quoting them correctly, we prevent injection and syntax errors while still
 ///   allowing legitimate names like `Users` or `Order_Items`.
 /// </summary>
-internal static class SqliteIdentifiers
+public static class SqliteIdentifiers
 {
     // Only letters, digits, and underscore allowed — matches your original rule.
     private static readonly Regex IdentifierRegex =
