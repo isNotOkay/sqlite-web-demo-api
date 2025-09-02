@@ -2,7 +2,7 @@
 
 namespace SqliteWebDemoApi.Services;
 
-public interface ISqliteBrowser
+public interface ISqliteService
 {
     Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListTablesAsync(CancellationToken cancellationToken);
     Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken);

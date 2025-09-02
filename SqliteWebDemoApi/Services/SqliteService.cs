@@ -4,7 +4,7 @@ using SqliteWebDemoApi.Utilities;
 
 namespace SqliteWebDemoApi.Services;
 
-public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
+public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
 {
     public Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListTablesAsync(CancellationToken ct) =>
         ListRelationsAsync(SqliteQueries.ListTables, ct);

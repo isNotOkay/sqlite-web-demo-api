@@ -11,7 +11,7 @@ builder.Services.AddOptions<DatabaseOptions>()
     .ValidateOnStart();
 
 builder.Services.AddScoped<ISqliteRepository, SqliteRepository>();
-builder.Services.AddScoped<ISqliteBrowser, SqliteBrowser>();
+builder.Services.AddScoped<ISqliteService, SqliteService>();
 builder.Services.AddControllers();
 
 builder.Services.AddCors(o =>

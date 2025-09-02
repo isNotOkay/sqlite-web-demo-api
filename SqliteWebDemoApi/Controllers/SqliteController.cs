@@ -6,7 +6,7 @@ namespace SqliteWebDemoApi.Controllers;
 
 [ApiController]
 [Route("api")]
-public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
+public sealed class SqliteController(ISqliteService service) : ControllerBase
 {
     private const int DefaultPage = 1;
     private const int DefaultPageSize = 50;
@@ -14,14 +14,14 @@ public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
     [HttpGet("tables")]
     public async Task<ActionResult<ListResponse<SqliteRelationInfo>>> GetTables(CancellationToken ct)
     {
-        var (items, total) = await browser.ListTablesAsync(ct);
+        var (items, total) = await service.ListTablesAsync(ct);
         return Ok(new ListResponse<SqliteRelationInfo> { Items = items, Total = total });
     }
 
     [HttpGet("views")]
     public async Task<ActionResult<ListResponse<SqliteRelationInfo>>> GetViews(CancellationToken ct)
     {
-        var (items, total) = await browser.ListViewsAsync(ct);
+        var (items, total) = await service.ListViewsAsync(ct);
         return Ok(new ListResponse<SqliteRelationInfo> { Items = items, Total = total });
     }
 
@@ -34,7 +34,7 @@ public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
     {
         try
         {
-            var result = await browser.GetTablePageAsync(tableId, page, pageSize, ct);
+            var result = await service.GetTablePageAsync(tableId, page, pageSize, ct);
             return Ok(result);
         }
         catch (ArgumentException ex)
@@ -56,7 +56,7 @@ public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
     {
         try
         {
-            var result = await browser.GetViewPageAsync(viewId, page, pageSize, ct);
+            var result = await service.GetViewPageAsync(viewId, page, pageSize, ct);
             return Ok(result);
         }
         catch (ArgumentException ex)

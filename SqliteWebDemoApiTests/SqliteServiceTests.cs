@@ -6,9 +6,9 @@ using SqliteWebDemoApi.Utilities;
 
 namespace SqliteWebDemoApiTest;
 
-public sealed class SqliteBrowserTests
+public sealed class SqliteServiceTests
 {
-    private static SqliteBrowser CreateService(Mock<ISqliteRepository> repoMock) =>
+    private static SqliteService CreateService(Mock<ISqliteRepository> repoMock) =>
         new(repoMock.Object);
 
 

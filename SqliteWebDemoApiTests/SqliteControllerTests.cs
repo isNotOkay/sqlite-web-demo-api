@@ -10,9 +10,9 @@ using SqliteWebDemoApi.Services;
 
 namespace SqliteWebDemoApiTests.Controllers
 {
-    public sealed class DatabaseControllerTests
+    public sealed class SqliteControllerTests
     {
-        private static DatabaseController CreateController(Mock<ISqliteBrowser> browserMock)
+        private static SqliteController CreateController(Mock<ISqliteService> browserMock)
             => new(browserMock.Object);
 
         // ---------- GetTables / GetViews (typed ListResponse<T>) ----------
@@ -26,7 +26,7 @@ namespace SqliteWebDemoApiTests.Controllers
                 new() { Name = "Users", RowCount = 3, Columns = new[] { "Id", "Name" } }
             };
 
-            var browser = new Mock<ISqliteBrowser>(MockBehavior.Strict);
+            var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.ListTablesAsync(It.IsAny<CancellationToken>()))
                    .ReturnsAsync((items, items.Count));
 
@@ -54,7 +54,7 @@ namespace SqliteWebDemoApiTests.Controllers
                 new() { Name = "ActiveUsers", RowCount = 10, Columns = new[] { "Id" } }
             };
 
-            var browser = new Mock<ISqliteBrowser>(MockBehavior.Strict);
+            var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.ListViewsAsync(It.IsAny<CancellationToken>()))
                    .ReturnsAsync((items, items.Count));
 
@@ -92,7 +92,7 @@ namespace SqliteWebDemoApiTests.Controllers
                 }
             };
 
-            var browser = new Mock<ISqliteBrowser>(MockBehavior.Strict);
+            var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.GetTablePageAsync("Users", 2, 50, It.IsAny<CancellationToken>()))
                    .ReturnsAsync(pageResult);
 
@@ -108,7 +108,7 @@ namespace SqliteWebDemoApiTests.Controllers
         [Fact]
         public async Task GetTableData_ReturnsBadRequest_OnArgumentException()
         {
-            var browser = new Mock<ISqliteBrowser>(MockBehavior.Strict);
+            var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.GetTablePageAsync("Bad Id", 1, 50, It.IsAny<CancellationToken>()))
                    .ThrowsAsync(new ArgumentException("Invalid identifier.", "tableId"));
 
@@ -124,7 +124,7 @@ namespace SqliteWebDemoApiTests.Controllers
         [Fact]
         public async Task GetTableData_ReturnsNotFound_OnKeyNotFoundException()
         {
-            var browser = new Mock<ISqliteBrowser>(MockBehavior.Strict);
+            var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.GetTablePageAsync("Missing", 1, 50, It.IsAny<CancellationToken>()))
                    .ThrowsAsync(new KeyNotFoundException("Table \"Missing\" not found."));
 
@@ -154,7 +154,7 @@ namespace SqliteWebDemoApiTests.Controllers
                 Data = new List<Dictionary<string, object?>>()
             };
 
-            var browser = new Mock<ISqliteBrowser>(MockBehavior.Strict);
+            var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.GetTablePageAsync("Users", It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
                    .Callback<string, int, int, CancellationToken>((_, p, s, _) =>
                    {
@@ -193,7 +193,7 @@ namespace SqliteWebDemoApiTests.Controllers
                 }
             };
 
-            var browser = new Mock<ISqliteBrowser>(MockBehavior.Strict);
+            var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.GetViewPageAsync("ActiveUsers", 1, 25, It.IsAny<CancellationToken>()))
                    .ReturnsAsync(pageResult);
 
@@ -209,7 +209,7 @@ namespace SqliteWebDemoApiTests.Controllers
         [Fact]
         public async Task GetViewData_ErrorMapping_Works()
         {
-            var browser = new Mock<ISqliteBrowser>(MockBehavior.Strict);
+            var browser = new Mock<ISqliteService>(MockBehavior.Strict);
 
             browser.Setup(b => b.GetViewPageAsync("bad", 1, 50, It.IsAny<CancellationToken>()))
                    .ThrowsAsync(new ArgumentException("Invalid identifier.", "viewId"));
