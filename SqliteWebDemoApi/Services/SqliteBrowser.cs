@@ -179,16 +179,7 @@ LIMIT @take OFFSET @offset;";
             for (int i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
 
             while (await reader.ReadAsync(ct))
-            {
-                var dict = new Dictionary<string, object?>(fieldCount, StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < fieldCount; i++)
-                {
-                    var val = await reader.IsDBNullAsync(i, ct) ? null : reader.GetValue(i);
-                    if (val is byte[] bytes) val = Convert.ToBase64String(bytes);
-                    dict[names[i]] = val;
-                }
-                rows.Add(dict);
-            }
+                rows.Add(await ReadRowAsync(reader, names, ct));
         }
 
         return new PagedResult<Dictionary<string, object?>>
@@ -205,29 +196,29 @@ LIMIT @take OFFSET @offset;";
 
     // ---------- DATA: views/{viewId} ----------
     public async Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
-        string viewId, int page, int pageSize, CancellationToken ct)
+        string viewId, int page, int pageSize, CancellationToken cancellationToken)
     {
         SqliteIdentifiers.EnsureValid(viewId, nameof(viewId));
 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
 
-        await using var conn = await repo.OpenConnectionAsync(ct);
+        await using var connection = await repo.OpenConnectionAsync(cancellationToken);
 
         // Ensure view exists
         const string viewExistsSql = @"SELECT 1 FROM sqlite_master WHERE type='view' AND name=@name;";
-        await using (var existsCmd = new SqliteCommand(viewExistsSql, conn))
+        await using (var existsCmd = new SqliteCommand(viewExistsSql, connection))
         {
             existsCmd.Parameters.AddWithValue("@name", viewId);
-            var exists = await existsCmd.ExecuteScalarAsync(ct);
+            var exists = await existsCmd.ExecuteScalarAsync(cancellationToken);
             if (exists is null) throw new KeyNotFoundException($"View \"{viewId}\" not found.");
         }
 
         var quoted = SqliteIdentifiers.Quote(viewId);
 
         long totalRows;
-        await using (var countCmd = new SqliteCommand($"SELECT COUNT(*) FROM {quoted};", conn))
-            totalRows = (long)(await countCmd.ExecuteScalarAsync(ct) ?? 0L);
+        await using (var countCmd = new SqliteCommand($"SELECT COUNT(*) FROM {quoted};", connection))
+            totalRows = (long)(await countCmd.ExecuteScalarAsync(cancellationToken) ?? 0L);
 
         var totalPages = (int)Math.Max(1, Math.Ceiling(totalRows / (double)pageSize));
         if (totalRows == 0)
@@ -253,27 +244,18 @@ FROM {quoted}
 LIMIT @take OFFSET @offset;";
 
         var rows = new List<Dictionary<string, object?>>(pageSize);
-        await using (var cmd = new SqliteCommand(dataSql, conn))
+        await using (var cmd = new SqliteCommand(dataSql, connection))
         {
             cmd.Parameters.AddWithValue("@take", pageSize);
             cmd.Parameters.AddWithValue("@offset", offset);
 
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
             var fieldCount = reader.FieldCount;
             var names = new string[fieldCount];
             for (int i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
 
-            while (await reader.ReadAsync(ct))
-            {
-                var dict = new Dictionary<string, object?>(fieldCount, StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < fieldCount; i++)
-                {
-                    var val = await reader.IsDBNullAsync(i, ct) ? null : reader.GetValue(i);
-                    if (val is byte[] bytes) val = Convert.ToBase64String(bytes);
-                    dict[names[i]] = val;
-                }
-                rows.Add(dict);
-            }
+            while (await reader.ReadAsync(cancellationToken))
+                rows.Add(await ReadRowAsync(reader, names, cancellationToken));
         }
 
         return new PagedResult<Dictionary<string, object?>>
@@ -286,5 +268,20 @@ LIMIT @take OFFSET @offset;";
             TotalPages = totalPages,
             Data = rows
         };
+    }
+    
+    private static async Task<Dictionary<string, object?>> ReadRowAsync(
+        SqliteDataReader reader, string[] names, CancellationToken ct)
+    {
+        var dict = new Dictionary<string, object?>(names.Length, StringComparer.OrdinalIgnoreCase);
+
+        for (int i = 0; i < names.Length; i++)
+        {
+            var val = await reader.IsDBNullAsync(i, ct) ? null : reader.GetValue(i);
+            if (val is byte[] bytes) val = Convert.ToBase64String(bytes);
+            dict[names[i]] = val;
+        }
+
+        return dict;
     }
 }

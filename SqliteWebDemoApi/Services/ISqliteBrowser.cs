@@ -12,5 +12,5 @@ public interface ISqliteBrowser
         string tableId, int page, int pageSize, CancellationToken ct);
 
     Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
-        string viewId, int page, int pageSize, CancellationToken ct);
+        string viewId, int page, int pageSize, CancellationToken cancellationToken);
 }
