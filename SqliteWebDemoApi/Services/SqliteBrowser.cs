@@ -1,24 +1,14 @@
-﻿// Services/SqliteBrowser.cs
-
-using System.Data;
-using System.Text.RegularExpressions;
+﻿using System.Data;
 using Microsoft.Data.Sqlite;
 using Models;
 using SqliteWebDemoApi.Models;
 using SqliteWebDemoApi.Repositories;
+using SqliteWebDemoApi.Utilities;
 
 namespace SqliteWebDemoApi.Services;
 
-public sealed class SqliteBrowser : ISqliteBrowser
+public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 {
-    private readonly ISqliteRepository _repo;
-
-    public SqliteBrowser(ISqliteRepository repo) => _repo = repo;
-
-    // ---------- Helpers ----------
-    private static string Quote(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
-    private static bool IsValidIdentifier(string id) => Regex.IsMatch(id, @"^[A-Za-z0-9_]+$");
-
     private static async Task<string[]> GetColumnNamesAsync(SqliteConnection conn, string quotedName, CancellationToken ct)
     {
         var cols = new List<string>();
@@ -32,7 +22,7 @@ public sealed class SqliteBrowser : ISqliteBrowser
     // ---------- LIST: tables ----------
     public async Task<(IReadOnlyList<TableInfo> Items, int Total)> ListTablesAsync(CancellationToken ct)
     {
-        await using var conn = await _repo.OpenConnectionAsync(ct);
+        await using var conn = await repo.OpenConnectionAsync(ct);
 
         var results = new List<TableInfo>();
 
@@ -49,7 +39,7 @@ ORDER BY name;";
             while (await r.ReadAsync(ct))
             {
                 var name = r.GetString(0);
-                var quoted = Quote(name);
+                var quoted = SqliteIdentifiers.Quote(name);
 
                 // Row count (best-effort)
                 long rowCount = 0;
@@ -83,7 +73,7 @@ ORDER BY name;";
     // ---------- LIST: views ----------
     public async Task<(IReadOnlyList<ViewInfo> Items, int Total)> ListViewsAsync(CancellationToken ct)
     {
-        await using var conn = await _repo.OpenConnectionAsync(ct);
+        await using var conn = await repo.OpenConnectionAsync(ct);
 
         var results = new List<ViewInfo>();
 
@@ -99,7 +89,7 @@ ORDER BY name;";
             while (await r.ReadAsync(ct))
             {
                 var name = r.GetString(0);
-                var quoted = Quote(name);
+                var quoted = SqliteIdentifiers.Quote(name);
 
                 string[] columns;
                 try { columns = await GetColumnNamesAsync(conn, quoted, ct); }
@@ -120,13 +110,13 @@ ORDER BY name;";
     public async Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
         string tableId, int page, int pageSize, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(tableId) || !IsValidIdentifier(tableId))
+        if (string.IsNullOrWhiteSpace(tableId) || !SqliteIdentifiers.IsValid(tableId))
             throw new ArgumentException("Invalid table name.", nameof(tableId));
 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
 
-        await using var conn = await _repo.OpenConnectionAsync(ct);
+        await using var conn = await repo.OpenConnectionAsync(ct);
 
         // Ensure table exists
         const string tableExistsSql = @"SELECT 1 FROM sqlite_master WHERE type='table' AND name=@name;";
@@ -138,7 +128,7 @@ ORDER BY name;";
         }
 
         // Count rows
-        var quoted = Quote(tableId);
+        var quoted = SqliteIdentifiers.Quote(tableId);
         long totalRows;
         await using (var countCmd = new SqliteCommand($"SELECT COUNT(*) FROM {quoted};", conn))
             totalRows = (long)(await countCmd.ExecuteScalarAsync(ct) ?? 0L);
@@ -218,13 +208,13 @@ LIMIT @take OFFSET @offset;";
     public async Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
         string viewId, int page, int pageSize, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(viewId) || !IsValidIdentifier(viewId))
+        if (string.IsNullOrWhiteSpace(viewId) || !SqliteIdentifiers.IsValid(viewId))
             throw new ArgumentException("Invalid view name.", nameof(viewId));
 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
 
-        await using var conn = await _repo.OpenConnectionAsync(ct);
+        await using var conn = await repo.OpenConnectionAsync(ct);
 
         // Ensure view exists
         const string viewExistsSql = @"SELECT 1 FROM sqlite_master WHERE type='view' AND name=@name;";
@@ -235,7 +225,7 @@ LIMIT @take OFFSET @offset;";
             if (exists is null) throw new KeyNotFoundException($"View \"{viewId}\" not found.");
         }
 
-        var quoted = Quote(viewId);
+        var quoted = SqliteIdentifiers.Quote(viewId);
 
         long totalRows;
         await using (var countCmd = new SqliteCommand($"SELECT COUNT(*) FROM {quoted};", conn))
