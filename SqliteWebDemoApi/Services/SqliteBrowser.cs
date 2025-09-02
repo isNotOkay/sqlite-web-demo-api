@@ -107,12 +107,12 @@ public sealed class SqliteBrowser(ISqliteRepository sqliteRepository) : ISqliteB
         var dataSql = SqliteQueries.SelectPage(quoted, orderByRowId: orderBy != "");
 
         var rows = new List<Dictionary<string, object?>>(normalizedPageSize);
-        await using (var cmd = new SqliteCommand(dataSql, connection))
+        await using (var sqliteCommand = new SqliteCommand(dataSql, connection))
         {
-            cmd.Parameters.AddWithValue("@take", normalizedPageSize);
-            cmd.Parameters.AddWithValue("@offset", offset);
+            sqliteCommand.Parameters.AddWithValue("@take", normalizedPageSize);
+            sqliteCommand.Parameters.AddWithValue("@offset", offset);
 
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
+            await using var reader = await sqliteCommand.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
             var fieldCount = reader.FieldCount;
             var names = new string[fieldCount];
             for (var i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
