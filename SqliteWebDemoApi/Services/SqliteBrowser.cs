@@ -130,15 +130,15 @@ public sealed class SqliteBrowser(ISqliteRepository sqliteRepository) : ISqliteB
         return (results, results.Count);
     }
 
-    private static async Task<long> TryCountRowsAsync(SqliteConnection connection, string quoted, CancellationToken ct)
+    private static async Task<long> TryCountRowsAsync(SqliteConnection connection, string quoted, CancellationToken cancellationToken)
     {
-        try { return await CountRowsAsync(connection, quoted, ct); }
+        try { return await CountRowsAsync(connection, quoted, cancellationToken); }
         catch { return 0; }
     }
 
-    private static async Task<string[]> TryGetColumnsAsync(SqliteConnection connection, string quoted, CancellationToken ct)
+    private static async Task<string[]> TryGetColumnsAsync(SqliteConnection connection, string quoted, CancellationToken cancellationToken)
     {
-        try { return await GetColumnNamesAsync(connection, quoted, ct); }
+        try { return await GetColumnNamesAsync(connection, quoted, cancellationToken); }
         catch { return []; }
     }
     
