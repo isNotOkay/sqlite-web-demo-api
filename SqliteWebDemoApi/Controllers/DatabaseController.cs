@@ -7,7 +7,9 @@ namespace SqliteWebDemoApi.Controllers;
 [Route("api")]
 public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
 {
-    // ---------- GET /api/tables ----------
+    private const int DefaultPage = 1;
+    private const int DefaultPageSize = 50;
+
     [HttpGet("tables")]
     public async Task<IActionResult> GetTables(CancellationToken ct)
     {
@@ -15,7 +17,6 @@ public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
         return Ok(new { items, total });
     }
 
-    // ---------- GET /api/views ----------
     [HttpGet("views")]
     public async Task<IActionResult> GetViews(CancellationToken ct)
     {
@@ -23,12 +24,11 @@ public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
         return Ok(new { items, total });
     }
 
-    // ---------- GET /api/tables/{tableId} ----------
     [HttpGet("tables/{tableId}")]
     public async Task<IActionResult> GetTableData(
         string tableId,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
+        [FromQuery] int page = DefaultPage,
+        [FromQuery] int pageSize = DefaultPageSize,
         CancellationToken ct = default)
     {
         try
@@ -46,12 +46,11 @@ public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
         }
     }
 
-    // ---------- GET /api/views/{viewId} ----------
     [HttpGet("views/{viewId}")]
     public async Task<IActionResult> GetViewData(
         string viewId,
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 50,
+        [FromQuery] int page = DefaultPage,
+        [FromQuery] int pageSize = DefaultPageSize,
         CancellationToken ct = default)
     {
         try
