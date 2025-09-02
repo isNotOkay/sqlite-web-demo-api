@@ -33,7 +33,7 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
 
             // Best-effort: some virtual objects/views may fail to count or enumerate schema
             var rowCount = await Try(async () => await CountRowsAsync(quoted, ct), fallback: 0L);
-            var columns = await Try(async () => await GetColumnNamesAsync(quoted, ct), fallback: Array.Empty<string>());
+            var columns = await Try(async () => await GetColumnNamesAsync(quoted, ct), fallback: []);
 
             results.Add(new SqliteRelationInfo
             {
