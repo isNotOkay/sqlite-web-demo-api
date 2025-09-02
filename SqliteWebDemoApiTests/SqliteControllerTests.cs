@@ -1,21 +1,16 @@
-﻿using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Moq;
-using Xunit;
 using SqliteWebDemoApi.Controllers;
 using SqliteWebDemoApi.Models;
 using SqliteWebDemoApi.Services;
 
-namespace SqliteWebDemoApiTests.Controllers
+namespace SqliteWebDemoApiTest
 {
     public sealed class SqliteControllerTests
     {
         private static SqliteController CreateController(Mock<ISqliteService> browserMock)
             => new(browserMock.Object);
 
-        // ---------- GetTables / GetViews (typed ListResponse<T>) ----------
 
         [Fact]
         public async Task GetTables_ReturnsOk_WithItemsAndTotal()
@@ -23,7 +18,7 @@ namespace SqliteWebDemoApiTests.Controllers
             // Arrange
             var items = new List<SqliteRelationInfo>
             {
-                new() { Name = "Users", RowCount = 3, Columns = new[] { "Id", "Name" } }
+                new() { Name = "Users", RowCount = 3, Columns = ["Id", "Name"] }
             };
 
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
@@ -33,7 +28,7 @@ namespace SqliteWebDemoApiTests.Controllers
             var controller = CreateController(browser);
 
             // Act
-            ActionResult<ListResponse<SqliteRelationInfo>> result = await controller.GetTables(CancellationToken.None);
+            var result = await controller.GetTables(CancellationToken.None);
 
             // Assert (controller returns Ok(dto) -> Result is OkObjectResult; Value is null)
             var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -51,7 +46,7 @@ namespace SqliteWebDemoApiTests.Controllers
             // Arrange
             var items = new List<SqliteRelationInfo>
             {
-                new() { Name = "ActiveUsers", RowCount = 10, Columns = new[] { "Id" } }
+                new() { Name = "ActiveUsers", RowCount = 10, Columns = ["Id"] }
             };
 
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
@@ -61,7 +56,7 @@ namespace SqliteWebDemoApiTests.Controllers
             var controller = CreateController(browser);
 
             // Act
-            ActionResult<ListResponse<SqliteRelationInfo>> result = await controller.GetViews(CancellationToken.None);
+            var result = await controller.GetViews(CancellationToken.None);
 
             // Assert
             var ok = Assert.IsType<OkObjectResult>(result.Result);
@@ -73,7 +68,6 @@ namespace SqliteWebDemoApiTests.Controllers
             browser.VerifyAll();
         }
 
-        // ---------- GetTableData (IActionResult) ----------
 
         [Fact]
         public async Task GetTableData_ReturnsOk_WithPagedResult()
@@ -173,9 +167,7 @@ namespace SqliteWebDemoApiTests.Controllers
             Assert.IsType<OkObjectResult>(result);
             browser.VerifyAll();
         }
-
-        // ---------- GetViewData (IActionResult) ----------
-
+        
         [Fact]
         public async Task GetViewData_ReturnsOk_WithPagedResult()
         {
