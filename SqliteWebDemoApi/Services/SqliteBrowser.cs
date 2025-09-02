@@ -110,8 +110,7 @@ ORDER BY name;";
     public async Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
         string tableId, int page, int pageSize, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(tableId) || !SqliteIdentifiers.IsValid(tableId))
-            throw new ArgumentException("Invalid table name.", nameof(tableId));
+        SqliteIdentifiers.EnsureValid(tableId, nameof(tableId));
 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
@@ -208,8 +207,7 @@ LIMIT @take OFFSET @offset;";
     public async Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
         string viewId, int page, int pageSize, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(viewId) || !SqliteIdentifiers.IsValid(viewId))
-            throw new ArgumentException("Invalid view name.", nameof(viewId));
+        SqliteIdentifiers.EnsureValid(viewId, nameof(viewId));
 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
