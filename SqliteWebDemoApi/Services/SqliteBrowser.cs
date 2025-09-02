@@ -1,13 +1,20 @@
-﻿using System.Data;
+﻿// Services/SqliteBrowser.cs
+
+using System.Data;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Models;
 using SqliteWebDemoApi.Models;
+using SqliteWebDemoApi.Repositories;
 
 namespace SqliteWebDemoApi.Services;
 
-public sealed class SqliteBrowser(Func<SqliteConnection> connFactory) : ISqliteBrowser
+public sealed class SqliteBrowser : ISqliteBrowser
 {
+    private readonly ISqliteRepository _repo;
+
+    public SqliteBrowser(ISqliteRepository repo) => _repo = repo;
+
     // ---------- Helpers ----------
     private static string Quote(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
     private static bool IsValidIdentifier(string id) => Regex.IsMatch(id, @"^[A-Za-z0-9_]+$");
@@ -25,8 +32,7 @@ public sealed class SqliteBrowser(Func<SqliteConnection> connFactory) : ISqliteB
     // ---------- LIST: tables ----------
     public async Task<(IReadOnlyList<TableInfo> Items, int Total)> ListTablesAsync(CancellationToken ct)
     {
-        await using var conn = connFactory();
-        await conn.OpenAsync(ct);
+        await using var conn = await _repo.OpenConnectionAsync(ct);
 
         var results = new List<TableInfo>();
 
@@ -52,7 +58,10 @@ ORDER BY name;";
                     await using var c2 = new SqliteCommand($"SELECT COUNT(*) FROM {quoted};", conn);
                     rowCount = (long)(await c2.ExecuteScalarAsync(ct) ?? 0L);
                 }
-                catch { /* view or virtual table mismatches, ignore */ }
+                catch
+                {
+                    // virtual tables / views may throw; ignore for summary
+                }
 
                 // Column names
                 string[] columns;
@@ -74,8 +83,7 @@ ORDER BY name;";
     // ---------- LIST: views ----------
     public async Task<(IReadOnlyList<ViewInfo> Items, int Total)> ListViewsAsync(CancellationToken ct)
     {
-        await using var conn = connFactory();
-        await conn.OpenAsync(ct);
+        await using var conn = await _repo.OpenConnectionAsync(ct);
 
         var results = new List<ViewInfo>();
 
@@ -118,8 +126,7 @@ ORDER BY name;";
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
 
-        await using var conn = connFactory();
-        await conn.OpenAsync(ct);
+        await using var conn = await _repo.OpenConnectionAsync(ct);
 
         // Ensure table exists
         const string tableExistsSql = @"SELECT 1 FROM sqlite_master WHERE type='table' AND name=@name;";
@@ -137,6 +144,20 @@ ORDER BY name;";
             totalRows = (long)(await countCmd.ExecuteScalarAsync(ct) ?? 0L);
 
         var totalPages = (int)Math.Max(1, Math.Ceiling(totalRows / (double)pageSize));
+        if (totalRows == 0)
+        {
+            return new PagedResult<Dictionary<string, object?>>
+            {
+                Type = "table",
+                Name = tableId,
+                Page = page,
+                PageSize = pageSize,
+                TotalRows = 0,
+                TotalPages = totalPages,
+                Data = Array.Empty<Dictionary<string, object?>>()
+            };
+        }
+
         page = Math.Min(page, totalPages);
         var offset = (page - 1) * pageSize;
 
@@ -203,8 +224,7 @@ LIMIT @take OFFSET @offset;";
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 1000);
 
-        await using var conn = connFactory();
-        await conn.OpenAsync(ct);
+        await using var conn = await _repo.OpenConnectionAsync(ct);
 
         // Ensure view exists
         const string viewExistsSql = @"SELECT 1 FROM sqlite_master WHERE type='view' AND name=@name;";
@@ -222,6 +242,20 @@ LIMIT @take OFFSET @offset;";
             totalRows = (long)(await countCmd.ExecuteScalarAsync(ct) ?? 0L);
 
         var totalPages = (int)Math.Max(1, Math.Ceiling(totalRows / (double)pageSize));
+        if (totalRows == 0)
+        {
+            return new PagedResult<Dictionary<string, object?>>
+            {
+                Type = "view",
+                Name = viewId,
+                Page = page,
+                PageSize = pageSize,
+                TotalRows = 0,
+                TotalPages = totalPages,
+                Data = Array.Empty<Dictionary<string, object?>>()
+            };
+        }
+
         page = Math.Min(page, totalPages);
         var offset = (page - 1) * pageSize;
 
