@@ -9,27 +9,16 @@ namespace SqliteWebDemoApi.Services;
 
 public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 {
-    private static async Task<string[]> GetColumnNamesAsync(SqliteConnection conn, string quotedName, CancellationToken ct)
+    public async Task<(IReadOnlyList<TableInfo> Items, int Total)> ListTablesAsync(CancellationToken cancellationToken)
     {
-        var cols = new List<string>();
-        await using var cmd = new SqliteCommand(SqliteQueries.SelectSchemaOnly(quotedName), conn);
-        await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly, ct);
-        for (var i = 0; i < reader.FieldCount; i++)
-            cols.Add(reader.GetName(i));
-        return cols.ToArray();
-    }
-
-    // ---------- LIST: /api/tables ----------
-    public async Task<(IReadOnlyList<TableInfo> Items, int Total)> ListTablesAsync(CancellationToken ct)
-    {
-        await using var conn = await repo.OpenConnectionAsync(ct);
+        await using var conn = await repo.OpenConnectionAsync(cancellationToken);
 
         var results = new List<TableInfo>();
 
         await using (var cmd = new SqliteCommand(SqliteQueries.ListTables, conn))
-        await using (var r = await cmd.ExecuteReaderAsync(ct))
+        await using (var r = await cmd.ExecuteReaderAsync(cancellationToken))
         {
-            while (await r.ReadAsync(ct))
+            while (await r.ReadAsync(cancellationToken))
             {
                 var name = r.GetString(0);
                 var quoted = SqliteIdentifiers.Quote(name);
@@ -38,7 +27,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
                 long rowCount = 0;
                 try
                 {
-                    rowCount = await CountRowsAsync(conn, quoted, ct);
+                    rowCount = await CountRowsAsync(conn, quoted, cancellationToken);
                 }
                 catch
                 {
@@ -47,7 +36,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 
                 // Column names
                 string[] columns;
-                try { columns = await GetColumnNamesAsync(conn, quoted, ct); }
+                try { columns = await GetColumnNamesAsync(conn, quoted, cancellationToken); }
                 catch { columns = []; }
 
                 results.Add(new TableInfo
@@ -62,23 +51,22 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
         return (results, results.Count);
     }
 
-    // ---------- LIST: /api/views ----------
-    public async Task<(IReadOnlyList<ViewInfo> Items, int Total)> ListViewsAsync(CancellationToken ct)
+    public async Task<(IReadOnlyList<ViewInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken)
     {
-        await using var conn = await repo.OpenConnectionAsync(ct);
+        await using var conn = await repo.OpenConnectionAsync(cancellationToken);
 
         var results = new List<ViewInfo>();
 
         await using (var cmd = new SqliteCommand(SqliteQueries.ListViews, conn))
-        await using (var r = await cmd.ExecuteReaderAsync(ct))
+        await using (var r = await cmd.ExecuteReaderAsync(cancellationToken))
         {
-            while (await r.ReadAsync(ct))
+            while (await r.ReadAsync(cancellationToken))
             {
                 var name = r.GetString(0);
                 var quoted = SqliteIdentifiers.Quote(name);
 
                 string[] columns;
-                try { columns = await GetColumnNamesAsync(conn, quoted, ct); }
+                try { columns = await GetColumnNamesAsync(conn, quoted, cancellationToken); }
                 catch { columns = []; }
 
                 results.Add(new ViewInfo
@@ -91,21 +79,20 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 
         return (results, results.Count);
     }
-
-    // ---------- DATA: /api/tables/{tableId} ----------
+    
     public async Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
-        string tableId, int page, int pageSize, CancellationToken ct)
+        string tableId, int page, int pageSize, CancellationToken cancellationToken)
     {
         SqliteIdentifiers.EnsureValid(tableId, nameof(tableId));
 
-        await using var conn = await repo.OpenConnectionAsync(ct);
+        await using var conn = await repo.OpenConnectionAsync(cancellationToken);
 
         // Ensure table exists
-        if (!await ObjectExistsAsync(conn, "table", tableId, ct))
+        if (!await ObjectExistsAsync(conn, "table", tableId, cancellationToken))
             throw new KeyNotFoundException($"Table \"{tableId}\" not found.");
 
         var quoted = SqliteIdentifiers.Quote(tableId);
-        var totalRows = await CountRowsAsync(conn, quoted, ct);
+        var totalRows = await CountRowsAsync(conn, quoted, cancellationToken);
 
         // Paging
         var (normalizedPage, normalizedPageSize, totalPages, offset) =
@@ -115,7 +102,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
             return BuildEmptyPage("table", tableId, normalizedPage, normalizedPageSize, totalPages);
 
         // Use rowid ordering only if NOT WITHOUT ROWID
-        var orderBy = await IsWithoutRowIdAsync(conn, tableId, ct) ? "" : "ORDER BY rowid";
+        var orderBy = await IsWithoutRowIdAsync(conn, tableId, cancellationToken) ? "" : "ORDER BY rowid";
         var dataSql = SqliteQueries.SelectPage(quoted, orderByRowId: orderBy != "");
 
         var rows = new List<Dictionary<string, object?>>(normalizedPageSize);
@@ -124,32 +111,31 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
             cmd.Parameters.AddWithValue("@take", normalizedPageSize);
             cmd.Parameters.AddWithValue("@offset", offset);
 
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
             var fieldCount = reader.FieldCount;
             var names = new string[fieldCount];
             for (var i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
 
-            while (await reader.ReadAsync(ct))
-                rows.Add(await ReadRowAsync(reader, names, ct));
+            while (await reader.ReadAsync(cancellationToken))
+                rows.Add(await ReadRowAsync(reader, names, cancellationToken));
         }
 
         return BuildPage("table", tableId, normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
     }
-
-    // ---------- DATA: /api/views/{viewId} ----------
+    
     public async Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
-        string viewId, int page, int pageSize, CancellationToken ct)
+        string viewId, int page, int pageSize, CancellationToken cancellationToken)
     {
         SqliteIdentifiers.EnsureValid(viewId, nameof(viewId));
 
-        await using var conn = await repo.OpenConnectionAsync(ct);
+        await using var conn = await repo.OpenConnectionAsync(cancellationToken);
 
         // Ensure view exists
-        if (!await ObjectExistsAsync(conn, "view", viewId, ct))
+        if (!await ObjectExistsAsync(conn, "view", viewId, cancellationToken))
             throw new KeyNotFoundException($"View \"{viewId}\" not found.");
 
         var quoted = SqliteIdentifiers.Quote(viewId);
-        var totalRows = await CountRowsAsync(conn, quoted, ct);
+        var totalRows = await CountRowsAsync(conn, quoted, cancellationToken);
 
         // Paging
         var (normalizedPage, normalizedPageSize, totalPages, offset) =
@@ -166,27 +152,36 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
             cmd.Parameters.AddWithValue("@take", normalizedPageSize);
             cmd.Parameters.AddWithValue("@offset", offset);
 
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
             var fieldCount = reader.FieldCount;
             var names = new string[fieldCount];
             for (var i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
 
-            while (await reader.ReadAsync(ct))
-                rows.Add(await ReadRowAsync(reader, names, ct));
+            while (await reader.ReadAsync(cancellationToken))
+                rows.Add(await ReadRowAsync(reader, names, cancellationToken));
         }
 
         return BuildPage("view", viewId, normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
     }
-
-    // ---------- Helpers ----------
+    
+    private static async Task<string[]> GetColumnNamesAsync(SqliteConnection connection, string quotedName, CancellationToken cancellationToken)
+    {
+        var columns = new List<string>();
+        await using var sqliteCommand = new SqliteCommand(SqliteQueries.SelectSchemaOnly(quotedName), connection);
+        await using var reader = await sqliteCommand.ExecuteReaderAsync(CommandBehavior.SchemaOnly, cancellationToken);
+        for (var i = 0; i < reader.FieldCount; i++)
+            columns.Add(reader.GetName(i));
+        return columns.ToArray();
+    }
+    
     private static async Task<Dictionary<string, object?>> ReadRowAsync(
-        SqliteDataReader reader, string[] names, CancellationToken ct)
+        SqliteDataReader reader, string[] names, CancellationToken cancellationToken)
     {
         var dict = new Dictionary<string, object?>(names.Length, StringComparer.OrdinalIgnoreCase);
 
         for (var i = 0; i < names.Length; i++)
         {
-            var val = await reader.IsDBNullAsync(i, ct) ? null : reader.GetValue(i);
+            var val = await reader.IsDBNullAsync(i, cancellationToken) ? null : reader.GetValue(i);
             if (val is byte[] bytes) val = Convert.ToBase64String(bytes);
             dict[names[i]] = val;
         }
@@ -194,28 +189,28 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
         return dict;
     }
 
-    private static async Task<bool> ObjectExistsAsync(SqliteConnection conn, string type, string name, CancellationToken ct)
+    private static async Task<bool> ObjectExistsAsync(SqliteConnection conn, string type, string name, CancellationToken cancellationToken)
     {
         await using var cmd = new SqliteCommand(SqliteQueries.ObjectExists, conn);
         cmd.Parameters.AddWithValue("@type", type);
         cmd.Parameters.AddWithValue("@name", name);
-        var exists = await cmd.ExecuteScalarAsync(ct);
+        var exists = await cmd.ExecuteScalarAsync(cancellationToken);
         return exists is not null;
     }
 
-    private static async Task<long> CountRowsAsync(SqliteConnection conn, string quotedName, CancellationToken ct)
+    private static async Task<long> CountRowsAsync(SqliteConnection conn, string quotedName, CancellationToken cancellationToken)
     {
         var sql = SqliteQueries.CountAll(quotedName);
         await using var cmd = new SqliteCommand(sql, conn);
-        var v = await cmd.ExecuteScalarAsync(ct);
+        var v = await cmd.ExecuteScalarAsync(cancellationToken);
         return (long)(v ?? 0L);
     }
 
-    private static async Task<bool> IsWithoutRowIdAsync(SqliteConnection conn, string tableName, CancellationToken ct)
+    private static async Task<bool> IsWithoutRowIdAsync(SqliteConnection conn, string tableName, CancellationToken cancellationToken)
     {
         await using var cmd = new SqliteCommand(SqliteQueries.CheckWithoutRowId, conn);
         cmd.Parameters.AddWithValue("@name", tableName);
-        var v = await cmd.ExecuteScalarAsync(ct);
+        var v = await cmd.ExecuteScalarAsync(cancellationToken);
         return v is long n && n > 0;
     }
 
