@@ -20,20 +20,23 @@ internal static class SqliteIdentifiers
         new(@"^[A-Za-z0-9_]+$", RegexOptions.Compiled);
 
     /// <summary>
-    /// Returns true if the identifier matches the safe pattern.
-    /// </summary>
-    public static bool IsValid(string identifier) =>
-        !string.IsNullOrWhiteSpace(identifier) &&
-        IdentifierRegex.IsMatch(identifier);
-
-    /// <summary>
     /// Ensures that the identifier is valid, otherwise throws an ArgumentException.
     /// Useful at API/service boundaries to fail fast.
     /// </summary>
-    public static string EnsureValid(string identifier, string paramName)
+    public static void EnsureValid(string identifier, string paramName)
     {
-        return !IsValid(identifier) ? throw new ArgumentException("Invalid identifier.", paramName) : identifier;
+        if (!IsValid(identifier))
+        {
+            throw new ArgumentException("Invalid identifier.", paramName);
+        }
     }
+
+    /// <summary>
+    /// Returns true if the identifier matches the safe pattern.
+    /// </summary>
+    private static bool IsValid(string identifier) =>
+        !string.IsNullOrWhiteSpace(identifier) &&
+        IdentifierRegex.IsMatch(identifier);
 
     /// <summary>
     /// Wraps an identifier in double quotes and escapes embedded quotes.
