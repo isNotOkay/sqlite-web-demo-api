@@ -65,18 +65,6 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
         return result is long longValue ? longValue : Convert.ToInt64(result ?? 0);
     }
 
-    public async Task<string[]> GetColumnNamesAsync(string quotedName, CancellationToken ct)
-    {
-        await using var connection = await OpenAsync(ct);
-        await using var sqliteCommand = new SqliteCommand(SqliteQueries.SelectSchemaOnly(quotedName), connection);
-        await using var reader = await sqliteCommand.ExecuteReaderAsync(CommandBehavior.SchemaOnly, ct);
-
-        var columns = new string[reader.FieldCount];
-        for (var i = 0; i < reader.FieldCount; i++)
-            columns[i] = reader.GetName(i);
-        return columns;
-    }
-
     public async Task<bool> IsWithoutRowIdAsync(string tableName, CancellationToken ct)
     {
         await using var connection = await OpenAsync(ct);
@@ -107,6 +95,18 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
             rows.Add(await ReadRowAsync(reader, names, ct));
 
         return rows;
+    }
+
+    private async Task<string[]> GetColumnNamesAsync(string quotedName, CancellationToken ct)
+    {
+        await using var connection = await OpenAsync(ct);
+        await using var sqliteCommand = new SqliteCommand(SqliteQueries.SelectSchemaOnly(quotedName), connection);
+        await using var reader = await sqliteCommand.ExecuteReaderAsync(CommandBehavior.SchemaOnly, ct);
+
+        var columns = new string[reader.FieldCount];
+        for (var i = 0; i < reader.FieldCount; i++)
+            columns[i] = reader.GetName(i);
+        return columns;
     }
 
     private static async Task<T> Try<T>(Func<Task<T>> thunk, T fallback)
