@@ -2,7 +2,7 @@
 
 namespace SqliteWebDemoApiTest;
 
-public sealed class PaginatorTests
+public sealed class PaginatorUtilTests
 {
     [Theory]
     [InlineData(1, 10, 95,  1, 10, 10,  0)]  // first page
@@ -13,7 +13,7 @@ public sealed class PaginatorTests
         int requestedPage, int requestedPageSize, long totalRows,
         int expectedPage, int expectedPageSize, int expectedTotalPages, int expectedOffset)
     {
-        var (page, pageSize, totalPages, offset) = Paginator.Paginate(requestedPage, requestedPageSize, totalRows);
+        var (page, pageSize, totalPages, offset) = PaginatorUtil.Paginate(requestedPage, requestedPageSize, totalRows);
 
         Assert.Equal(expectedPage, page);
         Assert.Equal(expectedPageSize, pageSize);
@@ -25,7 +25,7 @@ public sealed class PaginatorTests
     [Fact]
     public void Paginate_PageSizeIsClampedToMax()
     {
-        var (page, pageSize, totalPages, offset) = Paginator.Paginate(1, 5000, totalRows: 100);
+        var (page, pageSize, totalPages, offset) = PaginatorUtil.Paginate(1, 5000, totalRows: 100);
 
         Assert.Equal(1, page);
         Assert.Equal(1000, pageSize); // clamped
@@ -36,7 +36,7 @@ public sealed class PaginatorTests
     [Fact]
     public void Paginate_PageSizeBelowOneIsClampedUp()
     {
-        var (page, pageSize, totalPages, offset) = Paginator.Paginate(1, 0, totalRows: 10);
+        var (page, pageSize, totalPages, offset) = PaginatorUtil.Paginate(1, 0, totalRows: 10);
 
         Assert.Equal(1, page);
         Assert.Equal(1, pageSize); // clamped
@@ -47,7 +47,7 @@ public sealed class PaginatorTests
     [Fact]
     public void Paginate_TotalRowsZero_StillAtLeastOnePage()
     {
-        var (page, pageSize, totalPages, offset) = Paginator.Paginate(1, 10, totalRows: 0);
+        var (page, pageSize, totalPages, offset) = PaginatorUtil.Paginate(1, 10, totalRows: 0);
 
         Assert.Equal(1, page);
         Assert.Equal(10, pageSize);
@@ -58,7 +58,7 @@ public sealed class PaginatorTests
     [Fact]
     public void Paginate_PageRequestedBelowOne_IsClampedUp()
     {
-        var (page, pageSize, totalPages, offset) = Paginator.Paginate(0, 10, totalRows: 100);
+        var (page, pageSize, totalPages, offset) = PaginatorUtil.Paginate(0, 10, totalRows: 100);
 
         Assert.Equal(1, page);
         Assert.Equal(10, pageSize);

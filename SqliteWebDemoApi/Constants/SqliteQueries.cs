@@ -1,4 +1,4 @@
-﻿namespace SqliteWebDemoApi.Utilities;
+﻿namespace SqliteWebDemoApi.Constants;
 
 public static class SqliteQueries
 {

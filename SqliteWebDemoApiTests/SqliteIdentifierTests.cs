@@ -2,7 +2,7 @@
 
 namespace SqliteWebDemoApiTest;
 
-public sealed class SqliteIdentifiersTests
+public sealed class SqliteIdentifierUtilTests
 {
     [Theory]
     [InlineData("Users")]
@@ -12,7 +12,7 @@ public sealed class SqliteIdentifiersTests
     public void EnsureValid_AllowsSafeIdentifiers(string identifier)
     {
         // Act + Assert (no exception expected)
-        SqliteIdentifiers.EnsureValid(identifier, nameof(identifier));
+        SqliteIdentifierUtil.EnsureValid(identifier, nameof(identifier));
     }
 
     [Theory]
@@ -26,7 +26,7 @@ public sealed class SqliteIdentifiersTests
     public void EnsureValid_ThrowsForInvalidIdentifiers(string identifier)
     {
         // Act + Assert
-        Assert.Throws<ArgumentException>(() => SqliteIdentifiers.EnsureValid(identifier, nameof(identifier)));
+        Assert.Throws<ArgumentException>(() => SqliteIdentifierUtil.EnsureValid(identifier, nameof(identifier)));
     }
     
     [Theory]
@@ -36,7 +36,7 @@ public sealed class SqliteIdentifiersTests
     [InlineData("x", "\"x\"")]
     public void Quote_WrapsInDoubleQuotes(string input, string expected)
     {
-        var quoted = SqliteIdentifiers.Quote(input);
+        var quoted = SqliteIdentifierUtil.Quote(input);
         Assert.Equal(expected, quoted);
     }
 
@@ -44,7 +44,7 @@ public sealed class SqliteIdentifiersTests
     public void Quote_EscapesInternalQuotes()
     {
         const string input = "Some\"Name";
-        var quoted = SqliteIdentifiers.Quote(input);
+        var quoted = SqliteIdentifierUtil.Quote(input);
         Assert.Equal("\"Some\"\"Name\"", quoted);
     }
 }

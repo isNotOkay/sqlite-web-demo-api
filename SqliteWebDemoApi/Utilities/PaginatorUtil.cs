@@ -1,6 +1,6 @@
 ﻿namespace SqliteWebDemoApi.Utilities;
 
-public static class Paginator
+public static class PaginatorUtil
 {
     private const int MaxPageSize = 1000;
 

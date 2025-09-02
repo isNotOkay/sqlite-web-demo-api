@@ -1,4 +1,5 @@
-﻿using SqliteWebDemoApi.Models;
+﻿using SqliteWebDemoApi.Constants;
+using SqliteWebDemoApi.Models;
 using SqliteWebDemoApi.Repositories;
 using SqliteWebDemoApi.Utilities;
 
@@ -15,15 +16,15 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
     public async Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
         string tableId, int page, int pageSize, CancellationToken ct)
     {
-        SqliteIdentifiers.EnsureValid(tableId, nameof(tableId));
+        SqliteIdentifierUtil.EnsureValid(tableId, nameof(tableId));
         if (!await repo.ObjectExistsAsync("table", tableId, ct))
             throw new KeyNotFoundException($"Table \"{tableId}\" not found.");
 
-        var quoted = SqliteIdentifiers.Quote(tableId);
+        var quoted = SqliteIdentifierUtil.Quote(tableId);
         var totalRows = await repo.CountRowsAsync(quoted, ct);
 
         var (normalizedPage, normalizedPageSize, totalPages, offset) =
-            Paginator.Paginate(page, pageSize, totalRows);
+            PaginatorUtil.Paginate(page, pageSize, totalRows);
 
         if (totalRows == 0)
             return BuildPage("table", tableId, normalizedPage, normalizedPageSize, 0, totalPages, []);
@@ -37,15 +38,15 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
     public async Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
         string viewId, int page, int pageSize, CancellationToken ct)
     {
-        SqliteIdentifiers.EnsureValid(viewId, nameof(viewId));
+        SqliteIdentifierUtil.EnsureValid(viewId, nameof(viewId));
         if (!await repo.ObjectExistsAsync("view", viewId, ct))
             throw new KeyNotFoundException($"View \"{viewId}\" not found.");
 
-        var quoted = SqliteIdentifiers.Quote(viewId);
+        var quoted = SqliteIdentifierUtil.Quote(viewId);
         var totalRows = await repo.CountRowsAsync(quoted, ct);
 
         var (normalizedPage, normalizedPageSize, totalPages, offset) =
-            Paginator.Paginate(page, pageSize, totalRows);
+            PaginatorUtil.Paginate(page, pageSize, totalRows);
 
         if (totalRows == 0)
             return BuildPage("view", viewId, normalizedPage, normalizedPageSize, 0, totalPages, []);

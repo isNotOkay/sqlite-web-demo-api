@@ -1,9 +1,4 @@
 ﻿<wpf:ResourceDictionary xml:space="preserve" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:s="clr-namespace:System;assembly=mscorlib" xmlns:ss="urn:shemas-jetbrains-com:settings-storage-xaml" xmlns:wpf="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
 	<s:String x:Key="/Default/Environment/UnitTesting/UnitTestSessionStore/Sessions/=995b3634_002D4ed9_002D4e7a_002D94d0_002Dfc327409ddfc/@EntryIndexedValue">&lt;SessionState ContinuousTestingMode="0" IsActive="True" Name="All tests from SqliteBrowserTests.cs" xmlns="urn:schemas-jetbrains-com:jetbrains-ut-session"&gt;&#xD;
-  &lt;Or&gt;&#xD;
-    &lt;ProjectFile&gt;A2D69109-254E-498A-9FFA-56A0988B6181/f:SqliteBrowserTests.cs&lt;/ProjectFile&gt;&#xD;
-    &lt;ProjectFile&gt;A2D69109-254E-498A-9FFA-56A0988B6181/f:PaginatorTests.cs&lt;/ProjectFile&gt;&#xD;
-    &lt;ProjectFile&gt;A2D69109-254E-498A-9FFA-56A0988B6181/f:SqliteIdentifierTests.cs&lt;/ProjectFile&gt;&#xD;
-    &lt;ProjectFile&gt;A2D69109-254E-498A-9FFA-56A0988B6181/f:DatabaseControllerTests.cs&lt;/ProjectFile&gt;&#xD;
-  &lt;/Or&gt;&#xD;
+  &lt;Project Location="C:\Users\kayod\RiderProjects\SqliteWebDemoApi\SqliteWebDemoApiTests" Presentation="&amp;lt;SqliteWebDemoApiTests&amp;gt;" /&gt;&#xD;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>

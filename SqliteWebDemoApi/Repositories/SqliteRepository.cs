@@ -1,6 +1,7 @@
 ﻿using System.Data;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Options;
+using SqliteWebDemoApi.Constants;
 using SqliteWebDemoApi.Models;
 using SqliteWebDemoApi.Options;
 using SqliteWebDemoApi.Utilities;
@@ -29,7 +30,7 @@ public sealed class SqliteRepository(IOptions<DatabaseOptions> options) : ISqlit
         while (await reader.ReadAsync(ct))
         {
             var name = reader.GetString(0);
-            var quoted = SqliteIdentifiers.Quote(name);
+            var quoted = SqliteIdentifierUtil.Quote(name);
 
             // Best-effort: some virtual objects/views may fail to count or enumerate schema
             var rowCount = await Try(async () => await CountRowsAsync(quoted, ct), fallback: 0L);
