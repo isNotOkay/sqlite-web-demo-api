@@ -1,0 +1,29 @@
+@SqliteWebDemoApi_HostAddress = http://localhost:5282
+
+### --- SignalR: Open a TABLE in the UI ---
+### Select the "Users" table on all connected clients
+GET {{SqliteWebDemoApi_HostAddress}}/api/notify/select?kind=table&name=Users
+Accept: application/json
+
+###
+
+### Select the "Orders" table
+GET {{SqliteWebDemoApi_HostAddress}}/api/notify/select?kind=table&name=Orders
+Accept: application/json
+
+###
+
+### Select the "WideTable" (20 columns)
+GET {{SqliteWebDemoApi_HostAddress}}/api/notify/select?kind=table&name=WideTable
+Accept: application/json
+
+### --- SignalR: Open a VIEW in the UI ---
+### Select the "ActiveUsers" view
+GET {{SqliteWebDemoApi_HostAddress}}/api/notify/select?kind=view&name=ActiveUsers
+Accept: application/json
+
+###
+
+### Select the "RecentOrders" view
+GET {{SqliteWebDemoApi_HostAddress}}/api/notify/select?kind=view&name=RecentOrders
+Accept: application/json
