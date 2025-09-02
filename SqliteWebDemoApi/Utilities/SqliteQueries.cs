@@ -1,0 +1,40 @@
+﻿namespace SqliteWebDemoApi.Utilities;
+
+public static class SqliteQueries
+{
+    // --- sqlite_master lookups ---
+    public const string ListTables = @"
+SELECT name, sql
+FROM sqlite_master
+WHERE type = 'table'
+  AND name NOT LIKE 'sqlite_%'
+ORDER BY name;";
+
+    public const string ListViews = @"
+SELECT name, sql
+FROM sqlite_master
+WHERE type = 'view'
+ORDER BY name;";
+
+    public const string ObjectExists = @"
+SELECT 1
+FROM sqlite_master
+WHERE type = @type AND name = @name;";
+
+    public const string CheckWithoutRowId = @"
+SELECT instr(lower(sql), 'without rowid')
+FROM sqlite_master
+WHERE type = 'table' AND name = @name;";
+
+    // --- Data + schema helpers (require QUOTED identifiers) ---
+    public static string CountAll(string quotedName) =>
+        $"SELECT COUNT(*) FROM {quotedName};";
+
+    public static string SelectSchemaOnly(string quotedName) =>
+        $"SELECT * FROM {quotedName} LIMIT 0;";
+
+    public static string SelectPage(string quotedName, bool orderByRowId) =>
+        orderByRowId
+            ? $"SELECT * FROM {quotedName} ORDER BY rowid LIMIT @take OFFSET @offset;"
+            : $"SELECT * FROM {quotedName} LIMIT @take OFFSET @offset;";
+}

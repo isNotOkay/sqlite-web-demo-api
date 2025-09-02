@@ -12,7 +12,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
     private static async Task<string[]> GetColumnNamesAsync(SqliteConnection conn, string quotedName, CancellationToken ct)
     {
         var cols = new List<string>();
-        await using var cmd = new SqliteCommand($"SELECT * FROM {quotedName} LIMIT 0;", conn);
+        await using var cmd = new SqliteCommand(SqliteQueries.SelectSchemaOnly(quotedName), conn);
         await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly, ct);
         for (var i = 0; i < reader.FieldCount; i++)
             cols.Add(reader.GetName(i));
@@ -26,14 +26,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
 
         var results = new List<TableInfo>();
 
-        const string tablesSql = @"
-SELECT name, sql
-FROM sqlite_master
-WHERE type = 'table'
-  AND name NOT LIKE 'sqlite_%'
-ORDER BY name;";
-
-        await using (var cmd = new SqliteCommand(tablesSql, conn))
+        await using (var cmd = new SqliteCommand(SqliteQueries.ListTables, conn))
         await using (var r = await cmd.ExecuteReaderAsync(ct))
         {
             while (await r.ReadAsync(ct))
@@ -76,13 +69,7 @@ ORDER BY name;";
 
         var results = new List<ViewInfo>();
 
-        const string viewsSql = @"
-SELECT name, sql
-FROM sqlite_master
-WHERE type = 'view'
-ORDER BY name;";
-
-        await using (var cmd = new SqliteCommand(viewsSql, conn))
+        await using (var cmd = new SqliteCommand(SqliteQueries.ListViews, conn))
         await using (var r = await cmd.ExecuteReaderAsync(ct))
         {
             while (await r.ReadAsync(ct))
@@ -129,12 +116,7 @@ ORDER BY name;";
 
         // Use rowid ordering only if NOT WITHOUT ROWID
         var orderBy = await IsWithoutRowIdAsync(conn, tableId, ct) ? "" : "ORDER BY rowid";
-
-        var dataSql = $@"
-SELECT *
-FROM {quoted}
-{orderBy}
-LIMIT @take OFFSET @offset;";
+        var dataSql = SqliteQueries.SelectPage(quoted, orderByRowId: orderBy != "");
 
         var rows = new List<Dictionary<string, object?>>(normalizedPageSize);
         await using (var cmd = new SqliteCommand(dataSql, conn))
@@ -176,10 +158,7 @@ LIMIT @take OFFSET @offset;";
         if (totalRows == 0)
             return BuildEmptyPage("view", viewId, normalizedPage, normalizedPageSize, totalPages);
 
-        var dataSql = $@"
-SELECT *
-FROM {quoted}
-LIMIT @take OFFSET @offset;";
+        var dataSql = SqliteQueries.SelectPage(quoted, orderByRowId: false);
 
         var rows = new List<Dictionary<string, object?>>(normalizedPageSize);
         await using (var cmd = new SqliteCommand(dataSql, conn))
@@ -217,8 +196,7 @@ LIMIT @take OFFSET @offset;";
 
     private static async Task<bool> ObjectExistsAsync(SqliteConnection conn, string type, string name, CancellationToken ct)
     {
-        const string sql = @"SELECT 1 FROM sqlite_master WHERE type=@type AND name=@name;";
-        await using var cmd = new SqliteCommand(sql, conn);
+        await using var cmd = new SqliteCommand(SqliteQueries.ObjectExists, conn);
         cmd.Parameters.AddWithValue("@type", type);
         cmd.Parameters.AddWithValue("@name", name);
         var exists = await cmd.ExecuteScalarAsync(ct);
@@ -227,7 +205,7 @@ LIMIT @take OFFSET @offset;";
 
     private static async Task<long> CountRowsAsync(SqliteConnection conn, string quotedName, CancellationToken ct)
     {
-        var sql = $"SELECT COUNT(*) FROM {quotedName};";
+        var sql = SqliteQueries.CountAll(quotedName);
         await using var cmd = new SqliteCommand(sql, conn);
         var v = await cmd.ExecuteScalarAsync(ct);
         return (long)(v ?? 0L);
@@ -235,8 +213,7 @@ LIMIT @take OFFSET @offset;";
 
     private static async Task<bool> IsWithoutRowIdAsync(SqliteConnection conn, string tableName, CancellationToken ct)
     {
-        const string sql = @"SELECT instr(lower(sql),'without rowid') FROM sqlite_master WHERE type='table' AND name=@name;";
-        await using var cmd = new SqliteCommand(sql, conn);
+        await using var cmd = new SqliteCommand(SqliteQueries.CheckWithoutRowId, conn);
         cmd.Parameters.AddWithValue("@name", tableName);
         var v = await cmd.ExecuteScalarAsync(ct);
         return v is long n && n > 0;
