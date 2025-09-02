@@ -1,12 +1,11 @@
-﻿using Models;
-using SqliteWebDemoApi.Models;
+﻿using SqliteWebDemoApi.Models;
 
 namespace SqliteWebDemoApi.Services;
 
 public interface ISqliteBrowser
 {
-    Task<(IReadOnlyList<TableInfo> Items, int Total)> ListTablesAsync(CancellationToken cancellationToken);
-    Task<(IReadOnlyList<ViewInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken);
+    Task<(IReadOnlyList<DbObjectInfo> Items, int Total)> ListTablesAsync(CancellationToken cancellationToken);
+    Task<(IReadOnlyList<DbObjectInfo> Items, int Total)> ListViewsAsync(CancellationToken cancellationToken);
 
     Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
         string tableId, int page, int pageSize, CancellationToken cancellationToken);
