@@ -19,7 +19,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
         return cols.ToArray();
     }
 
-    // ---------- LIST: tables ----------
+    // ---------- LIST: /api/tables ----------
     public async Task<(IReadOnlyList<TableInfo> Items, int Total)> ListTablesAsync(CancellationToken ct)
     {
         await using var conn = await repo.OpenConnectionAsync(ct);
@@ -70,7 +70,7 @@ ORDER BY name;";
         return (results, results.Count);
     }
 
-    // ---------- LIST: views ----------
+    // ---------- LIST: /api/views ----------
     public async Task<(IReadOnlyList<ViewInfo> Items, int Total)> ListViewsAsync(CancellationToken ct)
     {
         await using var conn = await repo.OpenConnectionAsync(ct);
@@ -106,14 +106,11 @@ ORDER BY name;";
         return (results, results.Count);
     }
 
-    // ---------- DATA: tables/{tableId} ----------
+    // ---------- DATA: /api/tables/{tableId} ----------
     public async Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
         string tableId, int page, int pageSize, CancellationToken ct)
     {
         SqliteIdentifiers.EnsureValid(tableId, nameof(tableId));
-
-        page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 1000);
 
         await using var conn = await repo.OpenConnectionAsync(ct);
 
@@ -132,23 +129,23 @@ ORDER BY name;";
         await using (var countCmd = new SqliteCommand($"SELECT COUNT(*) FROM {quoted};", conn))
             totalRows = (long)(await countCmd.ExecuteScalarAsync(ct) ?? 0L);
 
-        var totalPages = (int)Math.Max(1, Math.Ceiling(totalRows / (double)pageSize));
+        // Paging
+        var (normalizedPage, normalizedPageSize, totalPages, offset) =
+            Paginator.Paginate(page, pageSize, totalRows);
+
         if (totalRows == 0)
         {
             return new PagedResult<Dictionary<string, object?>>
             {
                 Type = "table",
                 Name = tableId,
-                Page = page,
-                PageSize = pageSize,
+                Page = normalizedPage,
+                PageSize = normalizedPageSize,
                 TotalRows = 0,
                 TotalPages = totalPages,
                 Data = []
             };
         }
-
-        page = Math.Min(page, totalPages);
-        var offset = (page - 1) * pageSize;
 
         // Use rowid ordering only if NOT WITHOUT ROWID
         var withoutRowId = false;
@@ -167,10 +164,10 @@ FROM {quoted}
 {orderBy}
 LIMIT @take OFFSET @offset;";
 
-        var rows = new List<Dictionary<string, object?>>(pageSize);
+        var rows = new List<Dictionary<string, object?>>(normalizedPageSize);
         await using (var cmd = new SqliteCommand(dataSql, conn))
         {
-            cmd.Parameters.AddWithValue("@take", pageSize);
+            cmd.Parameters.AddWithValue("@take", normalizedPageSize);
             cmd.Parameters.AddWithValue("@offset", offset);
 
             await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
@@ -186,90 +183,88 @@ LIMIT @take OFFSET @offset;";
         {
             Type = "table",
             Name = tableId,
-            Page = page,
-            PageSize = pageSize,
+            Page = normalizedPage,
+            PageSize = normalizedPageSize,
             TotalRows = totalRows,
             TotalPages = totalPages,
             Data = rows
         };
     }
 
-    // ---------- DATA: views/{viewId} ----------
+    // ---------- DATA: /api/views/{viewId} ----------
     public async Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
-        string viewId, int page, int pageSize, CancellationToken cancellationToken)
+        string viewId, int page, int pageSize, CancellationToken ct)
     {
         SqliteIdentifiers.EnsureValid(viewId, nameof(viewId));
 
-        page = Math.Max(1, page);
-        pageSize = Math.Clamp(pageSize, 1, 1000);
-
-        await using var connection = await repo.OpenConnectionAsync(cancellationToken);
+        await using var conn = await repo.OpenConnectionAsync(ct);
 
         // Ensure view exists
         const string viewExistsSql = @"SELECT 1 FROM sqlite_master WHERE type='view' AND name=@name;";
-        await using (var existsCmd = new SqliteCommand(viewExistsSql, connection))
+        await using (var existsCmd = new SqliteCommand(viewExistsSql, conn))
         {
             existsCmd.Parameters.AddWithValue("@name", viewId);
-            var exists = await existsCmd.ExecuteScalarAsync(cancellationToken);
+            var exists = await existsCmd.ExecuteScalarAsync(ct);
             if (exists is null) throw new KeyNotFoundException($"View \"{viewId}\" not found.");
         }
 
         var quoted = SqliteIdentifiers.Quote(viewId);
 
         long totalRows;
-        await using (var countCmd = new SqliteCommand($"SELECT COUNT(*) FROM {quoted};", connection))
-            totalRows = (long)(await countCmd.ExecuteScalarAsync(cancellationToken) ?? 0L);
+        await using (var countCmd = new SqliteCommand($"SELECT COUNT(*) FROM {quoted};", conn))
+            totalRows = (long)(await countCmd.ExecuteScalarAsync(ct) ?? 0L);
 
-        var totalPages = (int)Math.Max(1, Math.Ceiling(totalRows / (double)pageSize));
+        // Paging
+        var (normalizedPage, normalizedPageSize, totalPages, offset) =
+            Paginator.Paginate(page, pageSize, totalRows);
+
         if (totalRows == 0)
         {
             return new PagedResult<Dictionary<string, object?>>
             {
                 Type = "view",
                 Name = viewId,
-                Page = page,
-                PageSize = pageSize,
+                Page = normalizedPage,
+                PageSize = normalizedPageSize,
                 TotalRows = 0,
                 TotalPages = totalPages,
                 Data = []
             };
         }
 
-        page = Math.Min(page, totalPages);
-        var offset = (page - 1) * pageSize;
-
         var dataSql = $@"
 SELECT *
 FROM {quoted}
 LIMIT @take OFFSET @offset;";
 
-        var rows = new List<Dictionary<string, object?>>(pageSize);
-        await using (var cmd = new SqliteCommand(dataSql, connection))
+        var rows = new List<Dictionary<string, object?>>(normalizedPageSize);
+        await using (var cmd = new SqliteCommand(dataSql, conn))
         {
-            cmd.Parameters.AddWithValue("@take", pageSize);
+            cmd.Parameters.AddWithValue("@take", normalizedPageSize);
             cmd.Parameters.AddWithValue("@offset", offset);
 
-            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
+            await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
             var fieldCount = reader.FieldCount;
             var names = new string[fieldCount];
             for (var i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
 
-            while (await reader.ReadAsync(cancellationToken))
-                rows.Add(await ReadRowAsync(reader, names, cancellationToken));
+            while (await reader.ReadAsync(ct))
+                rows.Add(await ReadRowAsync(reader, names, ct));
         }
 
         return new PagedResult<Dictionary<string, object?>>
         {
             Type = "view",
             Name = viewId,
-            Page = page,
-            PageSize = pageSize,
+            Page = normalizedPage,
+            PageSize = normalizedPageSize,
             TotalRows = totalRows,
             TotalPages = totalPages,
             Data = rows
         };
     }
-    
+
+    // ---------- Helpers ----------
     private static async Task<Dictionary<string, object?>> ReadRowAsync(
         SqliteDataReader reader, string[] names, CancellationToken ct)
     {
