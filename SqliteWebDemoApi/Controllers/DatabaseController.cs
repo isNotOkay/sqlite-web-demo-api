@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using SqliteWebDemoApi.Models;
 using SqliteWebDemoApi.Services;
 
 namespace SqliteWebDemoApi.Controllers;
@@ -11,17 +12,17 @@ public sealed class DatabaseController(ISqliteBrowser browser) : ControllerBase
     private const int DefaultPageSize = 50;
 
     [HttpGet("tables")]
-    public async Task<IActionResult> GetTables(CancellationToken ct)
+    public async Task<ActionResult<ListResponse<SqliteRelationInfo>>> GetTables(CancellationToken ct)
     {
         var (items, total) = await browser.ListTablesAsync(ct);
-        return Ok(new { items, total });
+        return Ok(new ListResponse<SqliteRelationInfo> { Items = items, Total = total });
     }
 
     [HttpGet("views")]
-    public async Task<IActionResult> GetViews(CancellationToken ct)
+    public async Task<ActionResult<ListResponse<SqliteRelationInfo>>> GetViews(CancellationToken ct)
     {
         var (items, total) = await browser.ListViewsAsync(ct);
-        return Ok(new { items, total });
+        return Ok(new ListResponse<SqliteRelationInfo> { Items = items, Total = total });
     }
 
     [HttpGet("tables/{tableId}")]

@@ -3,5 +3,7 @@
   &lt;Or&gt;&#xD;
     &lt;ProjectFile&gt;A2D69109-254E-498A-9FFA-56A0988B6181/f:SqliteBrowserTests.cs&lt;/ProjectFile&gt;&#xD;
     &lt;ProjectFile&gt;A2D69109-254E-498A-9FFA-56A0988B6181/f:PaginatorTests.cs&lt;/ProjectFile&gt;&#xD;
+    &lt;ProjectFile&gt;A2D69109-254E-498A-9FFA-56A0988B6181/f:SqliteIdentifierTests.cs&lt;/ProjectFile&gt;&#xD;
+    &lt;ProjectFile&gt;A2D69109-254E-498A-9FFA-56A0988B6181/f:DatabaseControllerTests.cs&lt;/ProjectFile&gt;&#xD;
   &lt;/Or&gt;&#xD;
 &lt;/SessionState&gt;</s:String></wpf:ResourceDictionary>
