@@ -14,7 +14,7 @@ public sealed class SqliteBrowser(ISqliteRepository repo) : ISqliteBrowser
         var cols = new List<string>();
         await using var cmd = new SqliteCommand($"SELECT * FROM {quotedName} LIMIT 0;", conn);
         await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SchemaOnly, ct);
-        for (int i = 0; i < reader.FieldCount; i++)
+        for (var i = 0; i < reader.FieldCount; i++)
             cols.Add(reader.GetName(i));
         return cols.ToArray();
     }
@@ -56,7 +56,7 @@ ORDER BY name;";
                 // Column names
                 string[] columns;
                 try { columns = await GetColumnNamesAsync(conn, quoted, ct); }
-                catch { columns = Array.Empty<string>(); }
+                catch { columns = []; }
 
                 results.Add(new TableInfo
                 {
@@ -93,7 +93,7 @@ ORDER BY name;";
 
                 string[] columns;
                 try { columns = await GetColumnNamesAsync(conn, quoted, ct); }
-                catch { columns = Array.Empty<string>(); }
+                catch { columns = []; }
 
                 results.Add(new ViewInfo
                 {
@@ -143,7 +143,7 @@ ORDER BY name;";
                 PageSize = pageSize,
                 TotalRows = 0,
                 TotalPages = totalPages,
-                Data = Array.Empty<Dictionary<string, object?>>()
+                Data = []
             };
         }
 
@@ -176,7 +176,7 @@ LIMIT @take OFFSET @offset;";
             await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, ct);
             var fieldCount = reader.FieldCount;
             var names = new string[fieldCount];
-            for (int i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
+            for (var i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
 
             while (await reader.ReadAsync(ct))
                 rows.Add(await ReadRowAsync(reader, names, ct));
@@ -231,7 +231,7 @@ LIMIT @take OFFSET @offset;";
                 PageSize = pageSize,
                 TotalRows = 0,
                 TotalPages = totalPages,
-                Data = Array.Empty<Dictionary<string, object?>>()
+                Data = []
             };
         }
 
@@ -252,7 +252,7 @@ LIMIT @take OFFSET @offset;";
             await using var reader = await cmd.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
             var fieldCount = reader.FieldCount;
             var names = new string[fieldCount];
-            for (int i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
+            for (var i = 0; i < fieldCount; i++) names[i] = reader.GetName(i);
 
             while (await reader.ReadAsync(cancellationToken))
                 rows.Add(await ReadRowAsync(reader, names, cancellationToken));
@@ -275,7 +275,7 @@ LIMIT @take OFFSET @offset;";
     {
         var dict = new Dictionary<string, object?>(names.Length, StringComparer.OrdinalIgnoreCase);
 
-        for (int i = 0; i < names.Length; i++)
+        for (var i = 0; i < names.Length; i++)
         {
             var val = await reader.IsDBNullAsync(i, ct) ? null : reader.GetValue(i);
             if (val is byte[] bytes) val = Convert.ToBase64String(bytes);
