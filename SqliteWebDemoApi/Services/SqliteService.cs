@@ -7,13 +7,13 @@ namespace SqliteWebDemoApi.Services;
 
 public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
 {
-    public Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListTablesAsync(CancellationToken ct) =>
+    public Task<(IReadOnlyList<SqliteRelationInfo> Items, long Total)> ListTablesAsync(CancellationToken ct) =>
         ListRelationsAsync(SqliteQueries.ListTables, ct);
 
-    public Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListViewsAsync(CancellationToken ct) =>
+    public Task<(IReadOnlyList<SqliteRelationInfo> Items, long Total)> ListViewsAsync(CancellationToken ct) =>
         ListRelationsAsync(SqliteQueries.ListViews, ct);
 
-    public async Task<PagedResult<Dictionary<string, object?>>> GetTablePageAsync(
+    public async Task<PageResult<Dictionary<string, object?>>> GetTablePageAsync(
         string tableId, int page, int pageSize, string? sortBy, string? sortDir, CancellationToken ct)
     {
         SqliteIdentifierUtil.EnsureValid(tableId, nameof(tableId));
@@ -27,7 +27,7 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
             PaginatorUtil.Paginate(page, pageSize, totalRows);
 
         if (totalRows == 0)
-            return BuildPage("table", tableId, normalizedPage, normalizedPageSize, 0, totalPages, []);
+            return BuildPage(normalizedPage, normalizedPageSize, 0, totalPages, []);
 
         // Sorting
         var (orderByColumn, orderByDesc, addRowIdTiebreaker) =
@@ -36,10 +36,10 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
         var rows = await repo.GetPageAsync(
             quoted, orderByColumn, orderByDesc, addRowIdTiebreaker, normalizedPageSize, offset, ct);
 
-        return BuildPage("table", tableId, normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
+        return BuildPage(normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
     }
 
-    public async Task<PagedResult<Dictionary<string, object?>>> GetViewPageAsync(
+    public async Task<PageResult<Dictionary<string, object?>>> GetViewPageAsync(
         string viewId, int page, int pageSize, string? sortBy, string? sortDir, CancellationToken ct)
     {
         SqliteIdentifierUtil.EnsureValid(viewId, nameof(viewId));
@@ -53,7 +53,7 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
             PaginatorUtil.Paginate(page, pageSize, totalRows);
 
         if (totalRows == 0)
-            return BuildPage("view", viewId, normalizedPage, normalizedPageSize, 0, totalPages, []);
+            return BuildPage(normalizedPage, normalizedPageSize, 0, totalPages, []);
 
         var (orderByColumn, orderByDesc, addRowIdTiebreaker) =
             await BuildSortAsync(quoted, isView: true, sortBy, sortDir, viewId, ct);
@@ -61,16 +61,17 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
         var rows = await repo.GetPageAsync(
             quoted, orderByColumn, orderByDesc, addRowIdTiebreaker, normalizedPageSize, offset, ct);
 
-        return BuildPage("view", viewId, normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
+        return BuildPage(normalizedPage, normalizedPageSize, totalRows, totalPages, rows);
     }
     
     private async Task<(string? OrderByColumn, bool OrderByDesc, bool AddRowIdTiebreaker)> BuildSortAsync(
         string quotedName, bool isView, string? sortBy, string? sortDir, string rawName, CancellationToken ct)
     {
         // Direction
-        var desc = (sortDir ?? "asc").Equals("desc", StringComparison.OrdinalIgnoreCase);
-        if (!"asc".Equals(sortDir ?? "asc", StringComparison.OrdinalIgnoreCase) &&
-            !"desc".Equals(sortDir ?? "asc", StringComparison.OrdinalIgnoreCase))
+        var dir = (sortDir ?? "asc");
+        var desc = dir.Equals("desc", StringComparison.OrdinalIgnoreCase);
+        if (!dir.Equals("asc", StringComparison.OrdinalIgnoreCase) &&
+            !dir.Equals("desc", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException("sortDir must be 'asc' or 'desc'.");
 
         // If client did not request a column, fall back to rowid for tables (if available), none for views.
@@ -95,28 +96,24 @@ public sealed class SqliteService(ISqliteRepository repo) : ISqliteService
         return (quotedColumn, desc, addRowId);
     }
 
-    private async Task<(IReadOnlyList<SqliteRelationInfo> Items, int Total)> ListRelationsAsync(string listSql, CancellationToken ct)
+    private async Task<(IReadOnlyList<SqliteRelationInfo> Items, long Total)> ListRelationsAsync(string listSql, CancellationToken ct)
     {
         var items = await repo.ListRelationsAsync(listSql, ct);
-        return (items, items.Count);
+        return (items, (long)items.Count);
     }
 
-    private static PagedResult<Dictionary<string, object?>> BuildPage(
-        string type,
-        string name,
+    private static PageResult<Dictionary<string, object?>> BuildPage(
         int page,
         int pageSize,
-        long totalRows,
+        long total,
         int totalPages,
-        IReadOnlyList<Dictionary<string, object?>> data) =>
+        IReadOnlyList<Dictionary<string, object?>> items) =>
         new()
         {
-            Type = type,
-            Name = name,
             Page = page,
             PageSize = pageSize,
-            TotalRows = totalRows,
+            Total = total,
             TotalPages = totalPages,
-            Data = data
+            Items = items
         };
 }

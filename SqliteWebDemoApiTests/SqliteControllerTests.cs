@@ -22,19 +22,19 @@ namespace SqliteWebDemoApiTest
 
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.ListTablesAsync(It.IsAny<CancellationToken>()))
-                   .ReturnsAsync((items, items.Count));
+                   .ReturnsAsync((items, (long)items.Count));
 
             var controller = CreateController(browser);
 
             // Act
-            var result = await controller.GetTables(CancellationToken.None);
+            var result = await controller.GetTables(ct: CancellationToken.None);
 
-            // Assert (controller returns Ok(dto) -> Result is OkObjectResult; Value is null)
+            // Assert
             var ok = Assert.IsType<OkObjectResult>(result.Result);
-            var payload = Assert.IsType<ListResponse<SqliteRelationInfo>>(ok.Value);
+            var payload = Assert.IsType<PageResult<SqliteRelationInfo>>(ok.Value);
 
             Assert.Equal(items, payload.Items);
-            Assert.Equal(items.Count, payload.Total);
+            Assert.Equal((long)items.Count, payload.Total);
 
             browser.VerifyAll();
         }
@@ -50,35 +50,33 @@ namespace SqliteWebDemoApiTest
 
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
             browser.Setup(b => b.ListViewsAsync(It.IsAny<CancellationToken>()))
-                   .ReturnsAsync((items, items.Count));
+                   .ReturnsAsync((items, (long)items.Count));
 
             var controller = CreateController(browser);
 
             // Act
-            var result = await controller.GetViews(CancellationToken.None);
+            var result = await controller.GetViews(ct: CancellationToken.None);
 
             // Assert
             var ok = Assert.IsType<OkObjectResult>(result.Result);
-            var payload = Assert.IsType<ListResponse<SqliteRelationInfo>>(ok.Value);
+            var payload = Assert.IsType<PageResult<SqliteRelationInfo>>(ok.Value);
 
             Assert.Equal(items, payload.Items);
-            Assert.Equal(items.Count, payload.Total);
+            Assert.Equal((long)items.Count, payload.Total);
 
             browser.VerifyAll();
         }
 
         [Fact]
-        public async Task GetTableData_ReturnsOk_WithPagedResult()
+        public async Task GetTableData_ReturnsOk_WithPageResult()
         {
-            var pageResult = new PagedResult<Dictionary<string, object?>>
+            var pageResult = new PageResult<Dictionary<string, object?>>
             {
-                Type = "table",
-                Name = "Users",
                 Page = 2,
                 PageSize = 50,
-                TotalRows = 123,
+                Total = 123,
                 TotalPages = 3,
-                Data = new List<Dictionary<string, object?>>
+                Items = new List<Dictionary<string, object?>>
                 {
                     new() { ["Id"] = 1, ["Name"] = "Alice" }
                 }
@@ -134,18 +132,16 @@ namespace SqliteWebDemoApiTest
         {
             int? capturedPage = null;
             int? capturedPageSize = null;
-            var capturedSortBy = "SENTINEL";
-            var capturedSortDir = "SENTINEL";
+            string? capturedSortBy = "SENTINEL";
+            string? capturedSortDir = "SENTINEL";
 
-            var pageResult = new PagedResult<Dictionary<string, object?>>
+            var pageResult = new PageResult<Dictionary<string, object?>>
             {
-                Type = "table",
-                Name = "Users",
                 Page = 1,
                 PageSize = 50,
-                TotalRows = 0,
+                Total = 0,
                 TotalPages = 1,
-                Data = new List<Dictionary<string, object?>>()
+                Items = new List<Dictionary<string, object?>>()
             };
 
             var browser = new Mock<ISqliteService>(MockBehavior.Strict);
@@ -179,17 +175,15 @@ namespace SqliteWebDemoApiTest
         }
 
         [Fact]
-        public async Task GetViewData_ReturnsOk_WithPagedResult()
+        public async Task GetViewData_ReturnsOk_WithPageResult()
         {
-            var pageResult = new PagedResult<Dictionary<string, object?>>
+            var pageResult = new PageResult<Dictionary<string, object?>>
             {
-                Type = "view",
-                Name = "ActiveUsers",
                 Page = 1,
                 PageSize = 25,
-                TotalRows = 42,
+                Total = 42,
                 TotalPages = 2,
-                Data = new List<Dictionary<string, object?>>
+                Items = new List<Dictionary<string, object?>>
                 {
                     new() { ["Id"] = 7, ["Name"] = "Z" }
                 }

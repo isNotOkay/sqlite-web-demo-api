@@ -35,7 +35,7 @@ public sealed class SqliteServiceTests
 
         // Assert
         Assert.Equal(items, result);
-        Assert.Equal(items.Count, total);
+        Assert.Equal((long)items.Count, total);
         Assert.Equal(SqliteQueries.ListTables, capturedSql);
         repo.VerifyAll();
     }
@@ -63,7 +63,7 @@ public sealed class SqliteServiceTests
 
         // Assert
         Assert.Equal(items, result);
-        Assert.Equal(items.Count, total);
+        Assert.Equal((long)items.Count, total);
         Assert.Equal(SqliteQueries.ListViews, capturedSql);
         repo.VerifyAll();
     }
@@ -105,13 +105,11 @@ public sealed class SqliteServiceTests
 
         // Assert
         // Paginator ensures TotalPages >= 1, and clamps page to [1..TotalPages]
-        Assert.Equal("table", page.Type);
-        Assert.Equal("Users", page.Name);
         Assert.Equal(1, page.Page);                // clamped
         Assert.Equal(100, page.PageSize);
-        Assert.Equal(0, page.TotalRows);
+        Assert.Equal(0, page.Total);
         Assert.Equal(1, page.TotalPages);
-        Assert.Empty(page.Data);
+        Assert.Empty(page.Items);
 
         repo.VerifyAll();
     }
@@ -138,7 +136,7 @@ public sealed class SqliteServiceTests
         ];
 
         // Capture parameters to validate ordering flags
-        var capturedOrderByColumn = "sentinel";
+        string? capturedOrderByColumn = "sentinel";
         bool? capturedOrderByDesc = null;
         bool? capturedAddRowIdTiebreaker = null;
         int? capturedTake = null;
@@ -174,13 +172,11 @@ public sealed class SqliteServiceTests
         Assert.Equal(50, capturedTake);
         Assert.Equal(50, capturedOffset);        // (page-1)*size
 
-        Assert.Equal("table", page.Type);
-        Assert.Equal("Users", page.Name);
         Assert.Equal(2, page.Page);
         Assert.Equal(50, page.PageSize);
-        Assert.Equal(123, page.TotalRows);
+        Assert.Equal(123, page.Total);
         Assert.Equal((int)Math.Ceiling(123 / 50d), page.TotalPages);
-        Assert.Same(rows, page.Data);
+        Assert.Same(rows, page.Items);
 
         repo.VerifyAll();
     }
@@ -229,10 +225,8 @@ public sealed class SqliteServiceTests
 
         // Assert
         Assert.False(capturedAddRowIdTiebreaker);
-        Assert.Equal("table", page.Type);
-        Assert.Equal("NoRowIdTable", page.Name);
-        Assert.Equal(10, page.TotalRows);
-        Assert.Same(rows, page.Data);
+        Assert.Equal(10, page.Total);
+        Assert.Same(rows, page.Items);
 
         repo.VerifyAll();
     }
@@ -274,13 +268,11 @@ public sealed class SqliteServiceTests
         var page = await svc.GetViewPageAsync("ActiveUsers", page: 3, pageSize: 25, sortBy: null, sortDir: "asc", CancellationToken.None);
 
         // Assert
-        Assert.Equal("view", page.Type);
-        Assert.Equal("ActiveUsers", page.Name);
         Assert.Equal(1, page.Page);    // clamped because totalRows = 0 -> totalPages = 1
         Assert.Equal(25, page.PageSize);
-        Assert.Equal(0, page.TotalRows);
+        Assert.Equal(0, page.Total);
         Assert.Equal(1, page.TotalPages);
-        Assert.Empty(page.Data);
+        Assert.Empty(page.Items);
 
         repo.VerifyAll();
     }
@@ -303,7 +295,7 @@ public sealed class SqliteServiceTests
         ];
 
         bool? capturedAddRowIdTiebreaker = null;
-        var capturedOrderByColumn = "sentinel";
+        string? capturedOrderByColumn = "sentinel";
 
         repo.Setup(r => r.GetPageAsync(
                         "\"ActiveUsers\"",
@@ -328,9 +320,8 @@ public sealed class SqliteServiceTests
         // Assert
         Assert.Null(capturedOrderByColumn);          // no explicit column by default
         Assert.False(capturedAddRowIdTiebreaker);    // never add rowid for views
-        Assert.Equal("view", page.Type);
-        Assert.Equal(42, page.TotalRows);
-        Assert.Same(rows, page.Data);
+        Assert.Equal(42, page.Total);
+        Assert.Same(rows, page.Items);
 
         repo.VerifyAll();
     }
